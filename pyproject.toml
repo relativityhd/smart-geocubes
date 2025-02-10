@@ -6,11 +6,11 @@ readme = "README.md"
 authors = [{ name = "relativityhd", email = "tobiashoelzer@hotmail.com" }]
 requires-python = ">=3.11"
 dependencies = [
-    "numcodecs>=0.15.0",
-    "numpy>=2.2.2",
+    "numcodecs>=0.15.1",
+    "numpy>=2,<3",
     "odc-geo>=0.4.9.post0",
     "xarray>=2025.1.2",
-    "zarr>=3.0.2",
+    "zarr>=3,<4",
 ]
 
 [project.optional-dependencies]
@@ -18,8 +18,9 @@ stac = [
     "odc-stac>=0.3.11",
     "pystac>=1.12.1",
     "pystac-client>=0.8.5",
-    "xpystac>=0.1.3"
+    "xpystac>=0.1.3",
 ]
+dask = ["bokeh>=3.6.3", "dask>=2025.1.0", "distributed>=2025.1.0"]
 
 
 [build-system]
@@ -27,12 +28,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = [
-    "ipykernel>=6.29.5",
-    "matplotlib>=3.10.0",
-    "rich>=13.9.4",
-    "ruff>=0.9.5",
-]
+dev = ["ipykernel>=6.29.5", "matplotlib>=3.10.0", "rich>=13.9.4", "ruff>=0.9.5"]
 
 
 # ==============================================================================

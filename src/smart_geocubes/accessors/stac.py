@@ -55,9 +55,9 @@ class STACAccessor(RemoteAccessor):
         # Collect the stac items
         items = pystac.ItemCollection(new_tiles)
 
-        assert abs(cls.extent.resolution.x) == abs(
-            cls.extent.resolution.y
-        ), "Unequal x and y resolution is not supported yet"
+        assert abs(cls.extent.resolution.x) == abs(cls.extent.resolution.y), (
+            "Unequal x and y resolution is not supported yet"
+        )
         resolution = abs(cls.extent.resolution.x)
 
         # Read the metadata and calculate the target slice
@@ -84,7 +84,7 @@ class STACAccessor(RemoteAccessor):
             bands=data_vars,
             engine="stac",
             resolution=resolution,
-            crs="3413",
+            crs=geobox.crs.to_epsg(),
             chunks=dict(cube_aoi.chunks),
         ).drop_vars("spatial_ref")
         if "time" not in data_vars:
@@ -101,7 +101,7 @@ class STACAccessor(RemoteAccessor):
         logger.debug(f"Downloaded and written data to datacube in {tick_downloade - tick_downloads:.2f}s")
 
         # Update loaded_tiles (with native zarr, since xarray does not support this yet)
-        loaded_tiles.extend(new_tiles.dem_id)
+        loaded_tiles.extend([tile.id for tile in new_tiles])
         za = zarr.open(storage)
         za.attrs["loaded_tiles"] = loaded_tiles
         # Xarray default behaviour is to read the consolidated metadata, hence, we must update it
