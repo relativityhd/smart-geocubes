@@ -4,6 +4,7 @@ import logging
 import multiprocessing as mp
 import time
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 import xarray as xr
 import zarr
@@ -13,6 +14,13 @@ from zarr.core.sync import sync
 from zarr.storage._common import make_store_path
 
 from smart_geocubes.storage import create_empty_datacube
+
+if TYPE_CHECKING:
+    try:
+        import geopandas as gpd
+        import matplotlib.pyplot as plt
+    except ImportError:
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +52,32 @@ class RemoteAccessor(ABC):
             data_vars (list, optional): The data variables of the datacube.
                 If set, overwrites the data variables set by the Dataset.
                 Only used at first datacube creation. Defaults to None.
+
+        """
+
+    @classmethod
+    @abstractmethod
+    def extend(cls, storage: zarr.storage.StoreLike) -> "gpd.GeoDataFrame":
+        """Get the extend, hence the already downloaded tiles, of the datacube.
+
+        Args:
+            storage (zarr.storage.StoreLike): The zarr storage where the datacube is located.
+
+        Returns:
+            gpd.GeoDataFrame: The extend of the datacube
+
+        """
+
+    @classmethod
+    @abstractmethod
+    def visualize_extend(cls, storage: zarr.storage.StoreLike) -> "plt.Figure":
+        """Visulize the extend, hence the already downloaded and filled data, of the datacube.
+
+        Args:
+            storage (zarr.storage.StoreLike): The zarr storage where the datacube is located.
+
+        Returns:
+            plt.Figure: The figure with the visualization
 
         """
 

@@ -2,14 +2,23 @@
 
 import logging
 import time
+from typing import TYPE_CHECKING
 
-import pystac
+import numpy as np
 import pystac_client
 import xarray as xr
 import zarr
 from odc.geo.geobox import GeoBox
+from odc.stac import stac_load
+from rich.progress import track
 
 from smart_geocubes.accessors.base import RemoteAccessor
+
+if TYPE_CHECKING:
+    try:
+        import geopandas as gpd
+    except ImportError:
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -52,60 +61,60 @@ class STACAccessor(RemoteAccessor):
             return
         logger.debug(f"Found {len(new_tiles)} new tiles: {[tile.id for tile in new_tiles]}")
 
-        # Collect the stac items
-        items = pystac.ItemCollection(new_tiles)
-
-        assert abs(cls.extent.resolution.x) == abs(cls.extent.resolution.y), (
-            "Unequal x and y resolution is not supported yet"
-        )
-        resolution = abs(cls.extent.resolution.x)
-
-        # Read the metadata and calculate the target slice
-        # TODO: There should be a way to calculate the target slice without downloading the metadata
-        # However, this is fine for now, since the overhead is very small and the resulting code very clear
-
-        # This does not download the data into memory, since chunks=-1 will create a dask array
-        # We need the coordinate information to calculate the target slice and the needed chunking for the real loading
-        ds = xr.open_dataset(items, bands=data_vars, engine="stac", resolution=resolution, crs="3413", chunks=-1)
-
-        # Get the slice of the datacube where the tile will be written
-        x_start_idx = int((ds.x[0] - cube.x[0]) // ds.x.attrs["resolution"])
-        y_start_idx = int((ds.y[0] - cube.y[0]) // ds.y.attrs["resolution"])
-        target_slice = {
-            "x": slice(x_start_idx, x_start_idx + ds.sizes["x"]),
-            "y": slice(y_start_idx, y_start_idx + ds.sizes["y"]),
-        }
-
-        cube_aoi = cube.isel(target_slice).drop_vars("spatial_ref")
-
-        # Now open the data for real, but still as dask array, hence the download occurs later
-        ds = xr.open_dataset(
-            items,
-            bands=data_vars,
-            engine="stac",
-            resolution=resolution,
-            crs=geobox.crs.to_epsg(),
-            chunks=dict(cube_aoi.chunks),
-        ).drop_vars("spatial_ref")
-        if "time" not in data_vars:
-            ds = ds.max("time")
-
-        # Sometimes the data downloaded from stac has nan-borders, which would overwrite existing data
-        # Replace these nan borders with existing data if there is any
-        ds = ds.fillna(cube_aoi)
-
-        # Write the data to the datacube, we manually aligned the chunks, hence we can do safe_chunks=False
-        tick_downloads = time.perf_counter()
-        ds.to_zarr(storage, region=target_slice, safe_chunks=False)
-        tick_downloade = time.perf_counter()
-        logger.debug(f"Downloaded and written data to datacube in {tick_downloade - tick_downloads:.2f}s")
-
-        # Update loaded_tiles (with native zarr, since xarray does not support this yet)
-        loaded_tiles.extend([tile.id for tile in new_tiles])
+        # Downlaod without dask
+        # We load each item one-by-one to reduce the memory footprint
         za = zarr.open(storage)
-        za.attrs["loaded_tiles"] = loaded_tiles
-        # Xarray default behaviour is to read the consolidated metadata, hence, we must update it
-        zarr.consolidate_metadata(storage)
+        for item in new_tiles:
+            tick_downloads = time.perf_counter()
+            tile = stac_load([item], bands=data_vars, chunks=None, progress=track)
+
+            # TODO: Allow for multi-temporal datacubes
+            tile = tile.max("time")
+
+            # Get the slice of the datacube where the tile will be written
+            x_start_idx = int((tile.x[0] - cube.x[0]) // tile.x.attrs["resolution"])
+            y_start_idx = int((tile.y[0] - cube.y[0]) // tile.y.attrs["resolution"])
+            target_slice = {
+                "x": slice(x_start_idx, x_start_idx + tile.sizes["x"]),
+                "y": slice(y_start_idx, y_start_idx + tile.sizes["y"]),
+            }
+            target_slice = tuple(target_slice.values())
+
+            for dvar in data_vars:
+                raw_data = tile[dvar].values
+                # Sometimes the data downloaded from stac has nan-borders, which would overwrite existing data
+                # Replace these nan borders with existing data if there is any
+                raw_data = np.where(~np.isnan(raw_data), raw_data, za[dvar][target_slice])
+                za[dvar][target_slice] = raw_data
+            loaded_tiles.append(item.id)
+            za.attrs["loaded_tiles"] = loaded_tiles
+            # Xarray default behaviour is to read the consolidated metadata, hence, we must update it
+            zarr.consolidate_metadata(storage)
+            tick_downloade = time.perf_counter()
+            logger.debug(f"Downloaded and written {item.id=} to datacube in {tick_downloade - tick_downloads:.2f}s")
 
         tick_fend = time.perf_counter()
         logger.info(f"Procedural download of {len(new_tiles)} tiles completed in {tick_fend - tick_fstart:.2f} seconds")
+
+    @classmethod
+    def extend(cls, storage: zarr.storage.StoreLike) -> "gpd.GeoDataFrame":
+        """Get the extend, hence the already downloaded tiles, of the datacube.
+
+        Args:
+            storage (zarr.storage.StoreLike): The zarr storage where the datacube is located.
+
+        Returns:
+            gpd.GeoDataFrame: The GeoDataFrame containing the extend of the datacube.
+
+        """
+        import geopandas as gpd
+
+        za = zarr.open("./data/arcticdem_32m.zarr", mode="r")
+        loaded_tiles = za.attrs["loaded_tiles"]
+
+        catalog = pystac_client.Client.open(cls.stac_api_url)
+        search = catalog.search(collections=[cls.collection], ids=loaded_tiles)
+        stac_json = search.item_collection_as_dict()
+
+        gdf = gpd.GeoDataFrame.from_features(stac_json, "epsg:4326")
+        return gdf
