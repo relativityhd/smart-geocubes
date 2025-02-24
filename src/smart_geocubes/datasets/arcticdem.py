@@ -3,7 +3,6 @@
 from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
-import zarr
 from odc.geo.geobox import GeoBox
 
 from smart_geocubes.accessors.stac import STACAccessor
@@ -20,8 +19,8 @@ class ArcticDEMABC(STACAccessor):
 
     stac_api_url = "https://stac.pgc.umn.edu/api/v1/"
     chunk_size = 3600
-    data_vars: ClassVar[list] = ["dem", "datamask"]
-    data_vars_meta: ClassVar[dict] = {
+    channels: ClassVar[list] = ["dem", "datamask"]
+    channels_meta: ClassVar[dict] = {
         "dem": {
             "long_name": "Digital Elevation Model",
             "data_source": "ArcticDEM",
@@ -30,20 +29,22 @@ class ArcticDEMABC(STACAccessor):
         },
         "datamask": {"long_name": "Data Mask", "source": "ArcticDEM"},
     }
-    data_vars_encoding: ClassVar[dict] = {
+    channels_encoding: ClassVar[dict] = {
         "dem": {"dtype": "float32"},
         "datamask": {"dtype": "bool"},
     }
 
-    @classmethod
-    def visualize_extend(cls, storage: zarr.storage.StoreLike) -> "plt.Figure":
+    def visualize_state(self, ax: "plt.Axes | None" = None) -> "plt.Figure | plt.Axes":
         """Visulize the extend, hence the already downloaded and filled data, of the datacube.
 
         Args:
-            storage (zarr.storage.StoreLike): The zarr storage where the datacube is located.
+            ax (plt.Axes | None): The axes drawn to. If None, will create a new figure and axes.
 
         Returns:
-            plt.Figure: The figure with the visualization
+            plt.Figure | plt.Axes: The figure with the visualization if no axes was provided, else the axes.
+
+        Raises:
+            ValueError: If the datacube is empty
 
         """
         import cartopy.crs as ccrs
@@ -51,13 +52,18 @@ class ArcticDEMABC(STACAccessor):
         import matplotlib.path as mpath
         import matplotlib.pyplot as plt
 
-        gdf = cls.extend(storage)
+        tile_info = self.current_state()
+
+        if tile_info is None:
+            raise ValueError("Datacube is not loaded yet. Can't visualize!")
 
         # Define the projection
         projection = ccrs.Stereographic(central_latitude=90, central_longitude=-45, true_scale_latitude=70)
 
         # Create a figure
-        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"projection": projection})
+        fig = None
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"projection": projection})
 
         # Set the extent to focus on the North Pole
         ax.set_extent([-180, 180, 60, 90], crs=ccrs.PlateCarree())
@@ -85,7 +91,7 @@ class ArcticDEMABC(STACAccessor):
 
         ax.set_boundary(circle, transform=ax.transAxes)
 
-        gdf.plot(
+        tile_info.plot(
             "title",
             ax=ax,
             transform=ccrs.PlateCarree(),
@@ -95,7 +101,10 @@ class ArcticDEMABC(STACAccessor):
             alpha=0.5,
         )
 
-        return fig
+        if fig is not None:
+            return fig
+        else:
+            return ax
 
 
 class ArcticDEM32m(ArcticDEMABC):
