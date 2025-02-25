@@ -36,6 +36,9 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = ["ipykernel>=6.29.5", "ipywidgets>=8.1.5", "rich>=13.9.4", "ruff>=0.9.5"]
+tests = [
+    "pytest>=8.3.4",
+]
 
 
 # ==============================================================================

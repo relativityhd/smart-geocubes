@@ -76,6 +76,7 @@ def create_empty_datacube(
     data_vars: list,
     meta: dict,
     var_encoding: dict,
+    overwrite: bool,
 ):
     """Create an empty datacube from a GeoBox covering the complete extent of the geobox's CRS.
 
@@ -87,6 +88,7 @@ def create_empty_datacube(
         data_vars (list): List of data variables which should be created
         meta (dict): Metadata for the data variables. Key must be in data_vars.
         var_encoding (dict): Encoding for the data variables. Key must be in data_vars.
+        overwrite (bool): If True, the datacube will be overwritten if it already exists.
 
     Raises:
         ValueError: If the geobox's CRS does not have x and y coordinates. EPSG:4326 is the only supported lat-lon CRS.
@@ -138,6 +140,7 @@ def create_empty_datacube(
         storage,
         encoding=encoding,
         compute=False,
+        mode="w" if overwrite else "w-",
     )
 
     tick_fend = time.perf_counter()

@@ -20,6 +20,7 @@ Features:
 - [ ] Overall: Add support for 3D data
 - [ ] Overall: Add support for 4D data
 - [ ] GEE Accessor
+- [ ] Widen support for lat-lon data
 
 Datasets:
 

@@ -81,22 +81,20 @@ class RemoteAccessor(ABC):
 
         """
         # Check if the zarr data already exists
-        if not overwrite:
-            cube_storage_path = sync(make_store_path(self.storage, mode="r"))
-            if not sync(cube_storage_path.is_empty()):
-                raise FileExistsError(
-                    f"Cannot create a new  datacube. {cube_storage_path} ({self.storage}) is not empty!"
-                )
+        cube_storage_path = sync(make_store_path(self.storage, mode="r"))
+        if not overwrite and not sync(cube_storage_path.is_empty()):
+            raise FileExistsError(f"Cannot create a new  datacube. {cube_storage_path} ({self.storage}) is not empty!")
 
         logger.debug(f"Creating a new zarr datacube with {cube_storage_path=}")
         create_empty_datacube(
             title=type(self).__name__,
             storage=self.storage,
-            geobox=self.cube_extent,
+            geobox=self.extent,
             chunk_size=self.chunk_size,
             data_vars=self.channels,
             meta=self.channels_meta,
             var_encoding=self.channels_encoding,
+            overwrite=overwrite,
         )
 
     @abstractmethod
@@ -183,7 +181,7 @@ class RemoteAccessor(ABC):
         # Download the adjacent tiles (if necessary)
         reference_geobox = geobox.to_crs(self.extent.crs, resolution=self.extent.resolution.x).pad(buffer)
         with download_lock:
-            self.procedural_download(reference_geobox, self.vars)
+            self.procedural_download(reference_geobox)
 
         # Load the datacube and set the spatial_ref since it is set as a coordinate within the zarr format
         chunks = None if persist else "auto"

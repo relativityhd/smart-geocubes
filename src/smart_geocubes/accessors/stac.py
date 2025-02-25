@@ -73,7 +73,8 @@ class STACAccessor(RemoteAccessor):
                 "x": slice(x_start_idx, x_start_idx + tile.sizes["x"]),
                 "y": slice(y_start_idx, y_start_idx + tile.sizes["y"]),
             }
-            target_slice = tuple(target_slice.values())
+            logger.debug(f"Writing {item.id=} to {target_slice=}")
+            target_slice = (target_slice["y"], target_slice["x"])
 
             for channel in self.channels:
                 raw_data = tile[channel].values
