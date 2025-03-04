@@ -1,6 +1,7 @@
 import os
 from typing import ClassVar
 
+import icechunk
 import numpy as np
 import pytest
 import xarray as xr
@@ -54,11 +55,12 @@ class AccessorMeter(RemoteAccessor):
 
 def test_create_datacube():
     for accessor_cls in [AccessorDegree, AccessorMeter]:
-        accessor = accessor_cls("test.zarr")
+        storage = icechunk.local_filesystem_storage("test.zarr")
+        accessor = accessor_cls(storage)
 
         accessor.create()
 
-        ds = xr.open_zarr("test.zarr", chunks={})
+        ds = xr.open_zarr("test.zarr", chunks={}, consolidated=False)
         try:
             print(ds.sizes)
             assert ds.sizes == {"x": 20000, "y": 20000}
@@ -100,7 +102,8 @@ def test_create_datacube():
 
 
 def test_create_datacube_exists():
-    accessor = AccessorDegree("test.zarr")
+    storage = icechunk.local_filesystem_storage("test.zarr")
+    accessor = AccessorDegree(storage)
     try:
         accessor.create()
         with pytest.raises(FileExistsError):
@@ -110,7 +113,8 @@ def test_create_datacube_exists():
 
 
 def test_create_datacube_overwrite():
-    accessor = AccessorDegree("test.zarr")
+    storage = icechunk.local_filesystem_storage("test.zarr")
+    accessor = AccessorDegree(storage)
     try:
         accessor.create()
         accessor.create(overwrite=True)

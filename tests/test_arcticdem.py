@@ -1,5 +1,8 @@
 import os
+from collections import namedtuple
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
+import icechunk
 from numpy.testing import assert_almost_equal
 from odc.geo.geobox import GeoBox
 
@@ -7,10 +10,11 @@ from smart_geocubes.datasets.arcticdem import ArcticDEM32m
 
 
 def test_arcticdem_download():
-    geobox = GeoBox.from_bbox((150, 65, 151, 65.5), shape=(1000, 1000))
-    accessor = ArcticDEM32m("arcticdem_32m.zarr")
-    adem = accessor.load(geobox, create=True)
     try:
+        geobox = GeoBox.from_bbox((150, 65, 151, 65.5), shape=(1000, 1000))
+        storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
+        accessor = ArcticDEM32m(storage)
+        adem = accessor.load(geobox, create=True)
         assert adem.dem.mean() == 102.0299
         assert adem.dem.min() == 46.34375
         assert adem.dem.max() == 483.83594
@@ -26,4 +30,69 @@ def test_arcticdem_download():
         )
     finally:
         del adem
+        os.system("rm -rf arcticdem_32m.zarr")
+
+
+Stats = namedtuple("Stats", ["mean", "min", "max"])
+
+
+def test_arcticdem_download_threaded():
+    try:
+        storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
+        accessor = ArcticDEM32m(storage)
+        accessor.create(overwrite=True)
+
+        def _task(i, geobox: GeoBox) -> Stats:
+            adem = accessor.load(geobox, concurrency_mode="threading")
+            return i, Stats(adem.dem.mean(), adem.dem.min(), adem.dem.max())
+
+        geoboxes = [
+            GeoBox.from_bbox((150, 65, 151, 65.5), shape=(1000, 1000)),
+            GeoBox.from_bbox((150.5, 65, 151.5, 65.5), shape=(1000, 1000)),
+            GeoBox.from_bbox((151, 65, 152, 65.5), shape=(1000, 1000)),
+        ]
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            results = list(executor.map(_task, list(range(3)), geoboxes))
+
+        for i, result in results:
+            if i != 0:
+                continue
+            assert result.mean == 102.0299
+            assert result.min == 46.34375
+            assert result.max == 483.83594
+    finally:
+        os.system("rm -rf arcticdem_32m.zarr")
+
+
+def _mp_task(i, geobox: GeoBox) -> tuple[int, Stats]:
+    storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
+    accessor = ArcticDEM32m(storage)
+    adem = accessor.load(geobox)
+    return i, (adem.dem.mean().item(), adem.dem.min().item(), adem.dem.max().item())
+
+
+# Currently not working
+def test_arcticdem_download_blocking_processes():
+    try:
+        storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
+        accessor = ArcticDEM32m(storage)
+        accessor.create(overwrite=True)
+
+        geoboxes = [
+            GeoBox.from_bbox((150, 65, 151, 65.5), shape=(1000, 1000)),
+            GeoBox.from_bbox((150.5, 65, 151.5, 65.5), shape=(1000, 1000)),
+            GeoBox.from_bbox((151, 65, 152, 65.5), shape=(1000, 1000)),
+        ]
+
+        with ProcessPoolExecutor(max_workers=3) as executor:
+            results = list(executor.map(_mp_task, list(range(3)), geoboxes))
+
+        for i, result in results:
+            if i != 0:
+                continue
+            assert result.mean == 102.0299
+            assert result.min == 46.34375
+            assert result.max == 483.83594
+    finally:
         os.system("rm -rf arcticdem_32m.zarr")

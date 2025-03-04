@@ -21,6 +21,7 @@ Features:
 - [ ] Overall: Add support for 4D data
 - [ ] GEE Accessor
 - [ ] Widen support for lat-lon data
+- [ ] Support different x-y resolutions
 
 Datasets:
 

@@ -4,8 +4,9 @@ version = "0.1.0"
 description = "A high-performance library for intelligent loading and caching of remote geospatial raster data, built with xarray and zarr."
 readme = "README.md"
 authors = [{ name = "relativityhd", email = "tobiashoelzer@hotmail.com" }]
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
+    "icechunk>=0.2.4",
     "numcodecs>=0.15.1",
     "numpy>=2,<3",
     "odc-geo>=0.4.9.post0",
