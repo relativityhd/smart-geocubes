@@ -1,9 +1,10 @@
 """Base class for remote accessors."""
 
 import logging
+import sys
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, NamedTuple, TypedDict, Unpack
 
 import icechunk
 import odc.geo
@@ -14,6 +15,7 @@ from numcodecs.zarr3 import Blosc
 from odc.geo.geobox import GeoBox
 from zarr.core.sync import sync
 
+from smart_geocubes.concurrency import AlreadyDownloadedError
 from smart_geocubes.storage import optimize_coord_encoding
 
 if TYPE_CHECKING:
@@ -27,6 +29,31 @@ logger = logging.getLogger(__name__)
 
 
 ConcurrencyModes = Literal["blocking", "threading"]  # Potential future modes: "dask", "process", "server"
+
+
+def _check_python_version(min_major: int, min_minor: int) -> bool:
+    """Check the current Python version against a minimum required version.
+
+    Args:
+        min_major (int): The minimum required major version.
+        min_minor (int): The minimum required minor version.
+
+    Returns:
+        bool: True if the current Python version is greater than or equal to the minimum required
+
+    """
+    return sys.version_info.major > min_major or (
+        sys.version_info.major == min_major and sys.version_info.minor >= min_minor
+    )
+
+
+class LoadParams(TypedDict):
+    """TypedDict for the load function parameters."""
+
+    buffer: int
+    persist: bool
+    create: bool
+    concurrency_mode: ConcurrencyModes
 
 
 class TileWrapper(NamedTuple):
@@ -60,7 +87,7 @@ class RemoteAccessor(ABC):
 
         Args:
             storage (icechunk.Storage): The icechunk storage of the datacube.
-            ### Storage specific
+            ### Creation specific
             The following arguments will overwrite the dataset defaults
             and are only necessary for the creation of a new datacube.
 
@@ -79,6 +106,7 @@ class RemoteAccessor(ABC):
             raise ValueError(f"Expected an icechunk.Storage, but got {type(storage)}")
         self.storage = storage
         logger.debug(f"Using storage {storage=}")
+        # TODO: disable "create" if running in a multi-process environment
         self.repo = icechunk.Repository.open_or_create(storage)  # Will create a "main" branch
         logger.debug(f"Using repository {self.repo=}")
 
@@ -95,17 +123,24 @@ class RemoteAccessor(ABC):
         if channels_encoding is not None:
             self.channels_encoding
 
-        # TODO: store the settings variables in zarr metadata and validate here
+        # TODO: store the settings variables in metadata and validate here
+
+        # The TypeVar used by the ThreadingHandler was added in 3.12
+        # The Shutdown method of the queue was added in 3.13
+        # Hence, we don't want to import the module unless Python 3.13 is installed
+        if _check_python_version(3, 13):
+            from smart_geocubes.concurrency.threading import ThreadingHandler
+
+            self.threading_handler = ThreadingHandler(self._threading_download)
 
     def create(self, overwrite: bool = False):
-        """Create an empty zarr datacube on disk.
+        """Create an empty datacube and write it to the store.
 
         Args:
             overwrite (bool, optional): Allowing overwriting an existing datacube. Defaults to False.
 
         Raises:
             FileExistsError: If a datacube already exists at location
-            ValueError: If the extent does not have x and y coordinates.
 
         """
         tick_fstart = time.perf_counter()
@@ -125,7 +160,10 @@ class RemoteAccessor(ABC):
         ds = xr.Dataset(
             {
                 name: odc.geo.xr.xr_zeros(
-                    self.extent, chunks=-1, dtype=self.channels_encoding[name].get("dtype", "float32")
+                    self.extent,
+                    chunks=-1,
+                    dtype=self.channels_encoding[name].get("dtype", "float32"),
+                    always_yx=True,
                 )
                 for name in self.channels
             },
@@ -135,14 +173,6 @@ class RemoteAccessor(ABC):
         # Add metadata
         for name, meta in self.channels_meta.items():
             ds[name].attrs.update(meta)
-
-        # Turn lat-lon into x-y
-        if self.extent.crs.epsg == 4326:
-            nmap = {"longitude": "x", "latitude": "y"}
-            ds = ds.rename(nmap)
-
-        if "x" not in ds.coords or "y" not in ds.coords:
-            raise ValueError(f"The dataset must have x and y coordinates, but got {ds.coords.keys()}")
 
         # Get the encoding for the coordinates, variables and spatial reference
         coords_encoding = {
@@ -181,27 +211,28 @@ class RemoteAccessor(ABC):
     def load_like(
         self,
         ref: xr.Dataset | xr.DataArray,
-        buffer: int = 0,
-        persist: bool = True,
-        create: bool = False,
-        concurrency_mode: ConcurrencyModes = "blocking",
+        **kwargs: Unpack[LoadParams],
     ) -> xr.Dataset:
         """Load the data for the given geobox.
 
         Args:
             ref (xr.Dataset | xr.DataArray): The reference dataarray or dataset to load the data for.
+            **kwargs: The load parameters (buffer, persist, create, concurrency_mode).
+            ### Kwargs:
             buffer (int, optional): The buffer around the projected geobox in pixels. Defaults to 0.
             persist (bool, optional): If the data should be persisted in memory.
                 If not, this will return a Dask backed Dataset. Defaults to True.
             create (bool, optional): Create a new zarr array at defined storage if it not exists.
                 This is not recommended, because it can have side effects in a multi-process environment.
                 Defaults to False.
+            concurrency_mode (ConcurrencyModes, optional): The concurrency mode for the download.
+                Defaults to "blocking".
 
         Returns:
             xr.Dataset: The loaded dataset in the same resolution and extent like the geobox.
 
         """
-        return self.load(geobox=ref.geobox, buffer=buffer, persist=persist, create=create)
+        return self.load(geobox=ref.geobox, **kwargs)
 
     def load(
         self,
@@ -221,6 +252,8 @@ class RemoteAccessor(ABC):
             create (bool, optional): Create a new zarr array at defined storage if it not exists.
                 This is not recommended, because it can have side effects in a multi-process environment.
                 Defaults to False.
+            concurrency_mode (ConcurrencyModes, optional): The concurrency mode for the download.
+                Defaults to "blocking".
 
         Returns:
             xr.Dataset: The loaded dataset in the same resolution and extent like the geobox.
@@ -265,6 +298,157 @@ class RemoteAccessor(ABC):
         logger.debug(f"{type(self).__name__} tile {'loaded' if persist else 'lazy-opened'} in {tused:.2f} seconds")
         return xrcube_aoi
 
+    def procedural_download(self, geobox: GeoBox, concurrency_mode: ConcurrencyModes = "blocking"):
+        """Download the data for the given geobox.
+
+        Note:
+            The "threading" concurrency mode requires Python 3.13 or higher.
+
+        Args:
+            geobox (GeoBox): The reference geobox to download the data for.
+            concurrency_mode (ConcurrencyModes, optional): The concurrency mode for the download.
+                Defaults to "blocking".
+
+        Raises:
+            ValueError: If an unknown concurrency mode is provided.
+
+
+        """
+        if concurrency_mode == "blocking":
+            self.procedural_download_blocking(geobox)
+        elif concurrency_mode == "threading":
+            self.procedural_download_threading(geobox)
+        else:
+            raise ValueError(f"Unknown concurrency mode {concurrency_mode}")
+
+    def procedural_download_blocking(self, geobox: GeoBox, tries: int = 5):
+        """Download tiles procedurally in blocking mode.
+
+        Warning:
+            This method is meant for single-process use, but can (in theory) be used in a multi-process environment.
+            However, in a multi-process environment it can happen that multiple processes try to write concurrently,
+            which results in a conflict.
+            In such cases, the download will be retried until it succeeds or the number of maximum-tries is reached.
+
+        Args:
+            accessor (RemoteAccessor): The accessor.
+            geobox (GeoBox): The geobox of the aoi to download.
+            tries (int, optional): Number of maximum tries. Defaults to 5.
+
+        Raises:
+            ValueError: If no adjacent tiles are found. This can happen if the geobox is out of the dataset bounds.
+            ValueError: If no tries are left.
+
+        """
+        if tries == 0:
+            logger.warning("No tries left, skipping download")
+            raise ValueError("Unable to commit, no tries left.")
+
+        tick_fstart = time.perf_counter()
+        adjacent_tiles = self.adjacent_tiles(geobox)
+        if not adjacent_tiles:
+            logger.error("No adjacent tiles found")
+            raise ValueError("No adjacent tiles found - is the provided geobox corrent?")
+        logger.debug(f"Found {len(adjacent_tiles)=} adjacent tiles")
+
+        session = self.repo.writable_session("main")
+        zcube = zarr.open(store=session.store, mode="r+")
+        loaded_tiles = zcube.attrs.get("loaded_tiles", [])
+        logger.debug(f"{len(loaded_tiles)=} tiles already loaded")
+        new_tiles = [tile for tile in adjacent_tiles if tile.id not in loaded_tiles]
+        logger.debug(f"Found {len(new_tiles)} new tiles to download")
+        if not new_tiles:
+            return
+
+        for tile in new_tiles:
+            logger.debug(f"Downloading {tile.id}")
+            tick_dstart = time.perf_counter()
+            self.download_tile(zcube, tile)
+            tick_dend = time.perf_counter()
+            logger.debug(f"Downloaded {tile.id} in {tick_dend - tick_dstart:.2f} seconds")
+            loaded_tiles.append(tile.id)
+            zcube.attrs["loaded_tiles"] = loaded_tiles
+
+        try:
+            session.rebase(icechunk.ConflictDetector())
+            session.commit(f"Procedurally downloaded tiles {[tile.id for tile in new_tiles]} in blocking mode")
+        # Currently not possible, because attrs will always result in a conflict
+        # except icechunk.RebaseFailedError as e:
+        #     logger.warning(f"Rebase failed: {e}")
+        #     logger.debug(f"Retrying download with {tries - 1} tries left")
+        #     self.procedural_download_blocking(geobox, tries=tries - 1)
+        except icechunk.ConflictError as e:
+            logger.warning(f"Icechunk session is after rebase still out of sync: {e}")
+            logger.debug(f"Retrying download with {tries - 1} tries left")
+            self.procedural_download_blocking(geobox, tries=tries - 1)
+
+        tick_fend = time.perf_counter()
+        logger.debug(f"Downloaded {len(new_tiles)} tiles in {tick_fend - tick_fstart:.2f} seconds")
+
+    def _threading_download(self, tile: TileWrapper):
+        session = self.repo.writable_session("main")
+        zcube = zarr.open(store=session.store, mode="r+")
+        loaded_tiles = zcube.attrs.get("loaded_tiles", [])
+
+        if tile.id in loaded_tiles:
+            logger.debug(f"Tile {tile.id} already loaded")
+            raise AlreadyDownloadedError
+
+        logger.debug(f"Downloading {tile.id}")
+        tick_dstart = time.perf_counter()
+        self.download_tile(zcube, tile)
+        tick_dend = time.perf_counter()
+        logger.debug(f"Downloaded {tile.id} in {tick_dend - tick_dstart:.2f} seconds")
+        loaded_tiles.append(tile.id)
+        zcube.attrs["loaded_tiles"] = loaded_tiles
+        session.rebase(icechunk.ConflictDetector())
+        session.commit(f"Procedurally downloaded {tile.id=} in threading mode")
+
+    def procedural_download_threading(self, geobox: GeoBox):
+        """Download tiles procedurally in threading mode.
+
+        Note:
+            This method ensures that only a single download is running at a time.
+            It uses a SetQueue to prevent duplicate downloads.
+            The threading mode requires Python 3.13 or higher.
+
+        Args:
+            accessor (RemoteAccessor): The accessor.
+            geobox (GeoBox): The geobox of the aoi to download.
+            tries (int, optional): Number of maximum tries. Defaults to 5.
+
+        Raises:
+            ValueError: If no adjacent tiles are found. This can happen if the geobox is out of the dataset bounds.
+            RuntimeError: If the Python version is lower than 3.13.
+
+        """
+        if not _check_python_version(3, 13):
+            raise RuntimeError("Threading mode requires Python 3.13 or higher")
+        with self.threading_handler:
+            adjacent_tiles = self.adjacent_tiles(geobox)
+            if not adjacent_tiles:
+                logger.error("No adjacent tiles found")
+                raise ValueError("No adjacent tiles found - is the provided geobox corrent?")
+            logger.debug(f"Found {len(adjacent_tiles)} adjacent tiles: {[t.id for t in adjacent_tiles]}")
+
+            # Wait until all new_items are loaded
+            prev_len = None
+            while True:
+                session = self.repo.readonly_session("main")
+                zcube = zarr.open(store=session.store, mode="r")
+                loaded_tiles = zcube.attrs.get("loaded_tiles", [])
+                new_tiles = [tile for tile in adjacent_tiles if tile.id not in loaded_tiles]
+                if prev_len is None:
+                    logger.debug(f"Found {len(new_tiles)} new tiles to download: {[t.id for t in new_tiles]}")
+                if not new_tiles:
+                    break
+                if prev_len is not None and prev_len != len(new_tiles):
+                    logger.debug(f"{len(new_tiles)} new tiles left to download: {[t.id for t in new_tiles]}")
+                for tile in new_tiles:
+                    self.threading_handler._queue.put(tile)
+                prev_len = len(new_tiles)
+                time.sleep(5)
+
     @abstractmethod
     def adjacent_tiles(self, geobox: GeoBox) -> list[TileWrapper]:
         """Get the adjacent tiles for the given geobox.
@@ -291,21 +475,11 @@ class RemoteAccessor(ABC):
 
         """
 
-    # TODO: move or delete -> think about type hints
-    @abstractmethod
-    def procedural_download(self, geobox: GeoBox, concurrency_mode: ConcurrencyModes = "blocking"):
-        """Download the data for the given geobox.
-
-        Must be implemented by the Concurrency-Mixins.
-
-        Args:
-            geobox (GeoBox): The reference geobox to download the data for.
-
-        """
-
     @abstractmethod
     def current_state(self) -> "gpd.GeoDataFrame | None":
         """Get info about currently stored tiles / chunk.
+
+        Must be implemented by the Accessor.
 
         Returns:
             gpd.GeoDataFrame | None: Tile or Chunk info.
@@ -315,6 +489,8 @@ class RemoteAccessor(ABC):
     @abstractmethod
     def visualize_state(self, ax: "plt.Axes | None" = None) -> "plt.Figure | plt.Axes":
         """Visulize currently stored tiles / chunk.
+
+        Must be implemented by the DatasetAccessor.
 
         Args:
             ax (plt.Axes | None, optional): The axes drawn to. If None, will create a new figure and axes.

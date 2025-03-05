@@ -4,13 +4,13 @@ version = "0.1.0"
 description = "A high-performance library for intelligent loading and caching of remote geospatial raster data, built with xarray and zarr."
 readme = "README.md"
 authors = [{ name = "relativityhd", email = "tobiashoelzer@hotmail.com" }]
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
-    "icechunk>=0.2.4",
-    "numcodecs>=0.15.1",
+    "icechunk>=0.2.5",
+    "numcodecs>=0.15.0",
     "numpy>=2,<3",
-    "odc-geo>=0.4.9.post0",
-    "xarray>=2025.1.2",
+    "odc-geo>=0.4.5",
+    "xarray>=2025.1.1",
     "zarr>=3,<4",
 ]
 
@@ -37,9 +37,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = ["ipykernel>=6.29.5", "ipywidgets>=8.1.5", "rich>=13.9.4", "ruff>=0.9.5"]
-tests = [
-    "pytest>=8.3.4",
-]
+tests = ["pytest>=8.3.4"]
 
 
 # ==============================================================================

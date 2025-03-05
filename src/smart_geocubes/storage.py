@@ -17,6 +17,8 @@ warnings.filterwarnings("ignore", category=UserWarning, message=zarr3consolidate
 
 
 class TargetSlice(NamedTuple):
+    """NamedTuple for a target slice, used for consistency checks."""
+
     y: slice
     x: slice
 

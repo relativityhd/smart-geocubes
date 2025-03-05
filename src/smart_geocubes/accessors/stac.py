@@ -7,8 +7,7 @@ import numpy as np
 import zarr
 from odc.geo.geobox import GeoBox
 
-from smart_geocubes.accessors.base import TileWrapper
-from smart_geocubes.concurrency import ConcurrentRemoteAccessor
+from smart_geocubes.accessors.base import RemoteAccessor, TileWrapper
 from smart_geocubes.storage import TargetSlice
 
 if TYPE_CHECKING:
@@ -20,13 +19,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class STACAccessor(ConcurrentRemoteAccessor):
+class STACAccessor(RemoteAccessor):
     """Accessor for STAC data."""
 
     stac_api_url: str
     collection: str
 
     def adjacent_tiles(self, geobox: GeoBox) -> list[TileWrapper]:
+        """Get adjacent tiles from a STAC API.
+
+        Args:
+            geobox (GeoBox): The geobox for which to get adjacent tiles.
+
+        Returns:
+            list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
+
+        """
         import pystac_client
 
         catalog = pystac_client.Client.open(self.stac_api_url)
@@ -35,6 +43,13 @@ class STACAccessor(ConcurrentRemoteAccessor):
         return [TileWrapper(item.id, item) for item in items]
 
     def download_tile(self, zcube: zarr.Array, stac_tile: TileWrapper):
+        """Download a tile from a STAC API and write it to a zarr datacube.
+
+        Args:
+            zcube (zarr.Array): The zarr datacube to write the tile to.
+            stac_tile (TileWrapper): The tile to download and write.
+
+        """
         from odc.stac import stac_load
 
         tile = stac_load([stac_tile.item], bands=self.channels, chunks=None, progress=None)
@@ -72,8 +87,9 @@ class STACAccessor(ConcurrentRemoteAccessor):
         import geopandas as gpd
         import pystac_client
 
-        za = zarr.open(self.storage, mode="r")
-        loaded_tiles = za.attrs["loaded_tiles"]
+        session = self.repo.readonly_session("main")
+        zcube = zarr.open(session.store, mode="r")
+        loaded_tiles = zcube.attrs.get("loaded_tiles", [])
 
         if len(loaded_tiles) == 0:
             return None
