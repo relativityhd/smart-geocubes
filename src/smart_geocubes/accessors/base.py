@@ -370,7 +370,7 @@ class RemoteAccessor(ABC):
             zcube.attrs["loaded_tiles"] = loaded_tiles
 
         try:
-            session.rebase(icechunk.ConflictDetector())
+            # session.rebase(icechunk.ConflictDetector())
             session.commit(f"Procedurally downloaded tiles {[tile.id for tile in new_tiles]} in blocking mode")
         # Currently not possible, because attrs will always result in a conflict
         # except icechunk.RebaseFailedError as e:
@@ -378,7 +378,7 @@ class RemoteAccessor(ABC):
         #     logger.debug(f"Retrying download with {tries - 1} tries left")
         #     self.procedural_download_blocking(geobox, tries=tries - 1)
         except icechunk.ConflictError as e:
-            logger.warning(f"Icechunk session is after rebase still out of sync: {e}")
+            logger.warning(f"Icechunk session is out of sync: {e}")
             logger.debug(f"Retrying download with {tries - 1} tries left")
             self.procedural_download_blocking(geobox, tries=tries - 1)
 
@@ -401,7 +401,7 @@ class RemoteAccessor(ABC):
         logger.debug(f"Downloaded {tile.id} in {tick_dend - tick_dstart:.2f} seconds")
         loaded_tiles.append(tile.id)
         zcube.attrs["loaded_tiles"] = loaded_tiles
-        session.rebase(icechunk.ConflictDetector())
+        # session.rebase(icechunk.ConflictDetector())
         session.commit(f"Procedurally downloaded {tile.id=} in threading mode")
 
     def procedural_download_threading(self, geobox: GeoBox):

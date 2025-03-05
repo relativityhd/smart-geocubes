@@ -1,3 +1,4 @@
+import multiprocessing as mp
 import os
 from collections import namedtuple
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -72,9 +73,9 @@ def _mp_task(i, geobox: GeoBox) -> tuple[int, Stats]:
     return i, (adem.dem.mean().item(), adem.dem.min().item(), adem.dem.max().item())
 
 
-# Currently not working
 def test_arcticdem_download_blocking_processes():
     try:
+        mp.set_start_method("forkserver")
         storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
         accessor = ArcticDEM32m(storage)
         accessor.create(overwrite=True)
@@ -91,6 +92,7 @@ def test_arcticdem_download_blocking_processes():
         for i, result in results:
             if i != 0:
                 continue
+            result = Stats(*result)
             assert result.mean == 102.0299
             assert result.min == 46.34375
             assert result.max == 483.83594
