@@ -89,7 +89,8 @@ class ThreadingHandler[T]:
         """Stop the download thread."""
         with self._lock:
             if self._queue.empty():
-                self._queue.shutdown()
+                self._queue.shutdown(immediate=True)
                 if self._dthread is not None:
                     self._dthread.join()
                     self._dthread = None
+                self._queue = SetQueue()

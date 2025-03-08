@@ -4,6 +4,7 @@ import logging
 import sys
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, NamedTuple, TypedDict, Unpack
 
 import icechunk
@@ -75,7 +76,7 @@ class RemoteAccessor(ABC):
 
     def __init__(
         self,
-        storage: icechunk.Storage,
+        storage: icechunk.Storage | Path | str,
         title: str | None = None,
         extent: GeoBox | None = None,
         chunk_size: int | None = None,
@@ -102,6 +103,9 @@ class RemoteAccessor(ABC):
             ValueError: If the storage is not an icechunk.Storage.
 
         """
+        if isinstance(storage, (str | Path)):
+            storage = storage if isinstance(storage, str) else str(storage.resolve())
+            storage = icechunk.local_filesystem_storage(storage)
         if not isinstance(storage, icechunk.Storage):
             raise ValueError(f"Expected an icechunk.Storage, but got {type(storage)}")
         self.storage = storage
@@ -261,7 +265,7 @@ class RemoteAccessor(ABC):
         """
         tick_fstart = time.perf_counter()
 
-        logger.debug(f"Found a reference resolution of {geobox.resolution.x}m")
+        logger.debug(f"{geobox=}: {geobox.resolution.x}m original resolution")
 
         # Create the datacube if it does not exist
         if create:
@@ -292,10 +296,10 @@ class RemoteAccessor(ABC):
             tick_sload = time.perf_counter()
             xrcube_aoi = xrcube_aoi.load()
             tick_eload = time.perf_counter()
-            logger.debug(f"{type(self).__name__} AOI loaded from disk in {tick_eload - tick_sload:.2f} seconds")
+            logger.debug(f"{geobox=}: {self.title} AOI loaded from disk in {tick_eload - tick_sload:.2f} seconds")
 
         tused = time.perf_counter() - tick_fstart
-        logger.debug(f"{type(self).__name__} tile {'loaded' if persist else 'lazy-opened'} in {tused:.2f} seconds")
+        logger.debug(f"{geobox=}: {self.title} tile {'loaded' if persist else 'lazy-opened'} in {tused:.2f} seconds")
         return xrcube_aoi
 
     def procedural_download(self, geobox: GeoBox, concurrency_mode: ConcurrencyModes = "blocking"):
@@ -347,25 +351,23 @@ class RemoteAccessor(ABC):
         tick_fstart = time.perf_counter()
         adjacent_tiles = self.adjacent_tiles(geobox)
         if not adjacent_tiles:
-            logger.error("No adjacent tiles found")
+            logger.error(f"{geobox=}: No adjacent tiles found: {adjacent_tiles=}")
             raise ValueError("No adjacent tiles found - is the provided geobox corrent?")
-        logger.debug(f"Found {len(adjacent_tiles)=} adjacent tiles")
 
         session = self.repo.writable_session("main")
         zcube = zarr.open(store=session.store, mode="r+")
         loaded_tiles = zcube.attrs.get("loaded_tiles", [])
-        logger.debug(f"{len(loaded_tiles)=} tiles already loaded")
         new_tiles = [tile for tile in adjacent_tiles if tile.id not in loaded_tiles]
-        logger.debug(f"Found {len(new_tiles)} new tiles to download")
+        logger.debug(f"{geobox=}:  {len(adjacent_tiles)=} & {len(loaded_tiles)=} -> {len(new_tiles)=} to download")
         if not new_tiles:
             return
 
         for tile in new_tiles:
-            logger.debug(f"Downloading {tile.id}")
+            logger.debug(f"{tile.id=}: Start downloading")
             tick_dstart = time.perf_counter()
             self.download_tile(zcube, tile)
             tick_dend = time.perf_counter()
-            logger.debug(f"Downloaded {tile.id} in {tick_dend - tick_dstart:.2f} seconds")
+            logger.debug(f"{tile.id=}: Done downloading in {tick_dend - tick_dstart:.2f} seconds")
             loaded_tiles.append(tile.id)
             zcube.attrs["loaded_tiles"] = loaded_tiles
 
@@ -383,26 +385,29 @@ class RemoteAccessor(ABC):
             self.procedural_download_blocking(geobox, tries=tries - 1)
 
         tick_fend = time.perf_counter()
-        logger.debug(f"Downloaded {len(new_tiles)} tiles in {tick_fend - tick_fstart:.2f} seconds")
+        logger.info(f"Downloaded {len(new_tiles)} tiles in {tick_fend - tick_fstart:.2f} seconds")
 
     def _threading_download(self, tile: TileWrapper):
+        tick_fstart = time.perf_counter()
         session = self.repo.writable_session("main")
         zcube = zarr.open(store=session.store, mode="r+")
         loaded_tiles = zcube.attrs.get("loaded_tiles", [])
 
         if tile.id in loaded_tiles:
-            logger.debug(f"Tile {tile.id} already loaded")
+            logger.debug(f"{tile.id=} Already loaded")
             raise AlreadyDownloadedError
 
-        logger.debug(f"Downloading {tile.id}")
+        logger.debug(f"{tile.id=}: Start downloading")
         tick_dstart = time.perf_counter()
         self.download_tile(zcube, tile)
         tick_dend = time.perf_counter()
-        logger.debug(f"Downloaded {tile.id} in {tick_dend - tick_dstart:.2f} seconds")
+        logger.debug(f"{tile.id=}: Done downloading in {tick_dend - tick_dstart:.2f} seconds")
         loaded_tiles.append(tile.id)
         zcube.attrs["loaded_tiles"] = loaded_tiles
         # session.rebase(icechunk.ConflictDetector())
         session.commit(f"Procedurally downloaded {tile.id=} in threading mode")
+        tick_fend = time.perf_counter()
+        logger.info(f"Downloaded one new tile in {tick_fend - tick_fstart:.2f} seconds")
 
     def procedural_download_threading(self, geobox: GeoBox):
         """Download tiles procedurally in threading mode.
@@ -427,9 +432,8 @@ class RemoteAccessor(ABC):
         with self.threading_handler:
             adjacent_tiles = self.adjacent_tiles(geobox)
             if not adjacent_tiles:
-                logger.error("No adjacent tiles found")
+                logger.error(f"{geobox=}: No adjacent tiles found: {adjacent_tiles=}")
                 raise ValueError("No adjacent tiles found - is the provided geobox corrent?")
-            logger.debug(f"Found {len(adjacent_tiles)} adjacent tiles: {[t.id for t in adjacent_tiles]}")
 
             # Wait until all new_items are loaded
             prev_len = None
@@ -438,16 +442,40 @@ class RemoteAccessor(ABC):
                 zcube = zarr.open(store=session.store, mode="r")
                 loaded_tiles = zcube.attrs.get("loaded_tiles", [])
                 new_tiles = [tile for tile in adjacent_tiles if tile.id not in loaded_tiles]
-                if prev_len is None:
-                    logger.debug(f"Found {len(new_tiles)} new tiles to download: {[t.id for t in new_tiles]}")
+                done_tiles = [tile for tile in adjacent_tiles if tile.id in loaded_tiles]
                 if not new_tiles:
                     break
-                if prev_len is not None and prev_len != len(new_tiles):
-                    logger.debug(f"{len(new_tiles)} new tiles left to download: {[t.id for t in new_tiles]}")
+                if prev_len != len(new_tiles):
+                    logger.debug(
+                        f"{geobox=}: {len(done_tiles)} of {len(adjacent_tiles)} downloaded."
+                        f" Missing: {[t.id for t in new_tiles]} Done: {[t.id for t in done_tiles]}"
+                    )
                 for tile in new_tiles:
                     self.threading_handler._queue.put(tile)
                 prev_len = len(new_tiles)
                 time.sleep(5)
+
+    def open_zarr(self) -> zarr.Group:
+        """Open the zarr datacube in read-only mode.
+
+        Returns:
+            zarr.Group: The zarr datacube.
+
+        """
+        session = self.repo.readonly_session("main")
+        zcube = zarr.open(store=session.store, mode="r")
+        return zcube
+
+    def open_xarray(self) -> xr.Dataset:
+        """Open the xarray datacube in read-only mode.
+
+        Returns:
+            xr.Dataset: The xarray datacube.
+
+        """
+        session = self.repo.readonly_session("main")
+        xcube = xr.open_zarr(session.store, mask_and_scale=False, consolidated=False).set_coords("spatial_ref")
+        return xcube
 
     @abstractmethod
     def adjacent_tiles(self, geobox: GeoBox) -> list[TileWrapper]:

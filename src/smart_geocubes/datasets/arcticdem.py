@@ -66,7 +66,7 @@ class ArcticDEMABC(STACAccessor):
             fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"projection": projection})
 
         # Set the extent to focus on the North Pole
-        ax.set_extent([-180, 180, 60, 90], crs=ccrs.PlateCarree())
+        ax.set_extent([-180, 180, 50, 90], crs=ccrs.PlateCarree())
 
         # Add features
         ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black", facecolor="white")
@@ -111,18 +111,21 @@ class ArcticDEM32m(ArcticDEMABC):
     """Accessor for ArcticDEM 32m data."""
 
     collection = "arcticdem-mosaics-v4.1-32m"
-    extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=32)
+    # extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=32)
+    extent: GeoBox = GeoBox.from_bbox((-4000096, -3400096, 3400096, 4100096), "epsg:3413", resolution=32)
 
 
 class ArcticDEM10m(ArcticDEMABC):
     """Accessor for ArcticDEM 10m data."""
 
     collection = "arcticdem-mosaics-v4.1-10m"
-    extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=10)
+    # extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=10)
+    extent: GeoBox = GeoBox.from_bbox((-4000100, -3400100, 3400100, 4100100), "epsg:3413", resolution=10)
 
 
 class ArcticDEM2m(ArcticDEMABC):
     """Accessor for ArcticDEM 2m data."""
 
     collection = "arcticdem-mosaics-v4.1-2m"
-    extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=2)
+    # extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=2)
+    extent: GeoBox = GeoBox.from_bbox((-4000100, -3400100, 3400100, 4100100), "epsg:3413", resolution=2)

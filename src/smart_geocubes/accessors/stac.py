@@ -4,11 +4,11 @@ import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
+import xarray as xr
 import zarr
-from odc.geo.geobox import GeoBox
+from odc.geo.geobox import GeoBox, Resolution
 
 from smart_geocubes.accessors.base import RemoteAccessor, TileWrapper
-from smart_geocubes.storage import TargetSlice
 
 if TYPE_CHECKING:
     try:
@@ -17,6 +17,59 @@ if TYPE_CHECKING:
         pass
 
 logger = logging.getLogger(__name__)
+
+
+def get_geobox_from_zarr(zcube: zarr.Group) -> GeoBox:
+    """Turn a zarr datacube into a GeoBox.
+
+    Expects the zarr datacube to be created by xarray, hence the following structure and attributes are needed:
+    - Must be a zarr group with at least "x", "y" and "spatial_ref" arrays
+    - "x" and "y" must have a "resolution" attribute
+    - "spatial_ref" must have a "crs_wkt" attribute
+    - "x" and "y" must have at least two values each
+
+    Args:
+        zcube (zarr.Group): The zarr datacube to turn into a GeoBox.
+
+    Returns:
+        GeoBox: The GeoBox created from the zarr datacube.
+
+    """
+    res = Resolution(zcube["x"].attrs.get("resolution"), zcube["y"].attrs.get("resolution"))
+    return GeoBox.from_bbox(
+        (zcube["x"][0], zcube["y"][-1], zcube["x"][-1], zcube["y"][0]),
+        resolution=res,
+        crs=zcube["spatial_ref"].attrs["crs_wkt"],
+    )
+
+
+def correct_bounds(tile: xr.Dataset, zgeobox: GeoBox) -> xr.Dataset:
+    """Correct the bounds of a tile to fit within a GeoBox.
+
+    Args:
+        tile (xr.Dataset): The tile to correct.
+        zgeobox (GeoBox): The GeoBox to correct the tile to.
+
+    Raises:
+        ValueError: If the tile is out of the geobox's bounds.
+
+    Returns:
+        xr.Dataset: The corrected tile.
+
+    """
+    yslice, xslice = tile.odc.geobox.overlap_roi(zgeobox)
+    yslice_is_valid = yslice.start >= 0 and yslice.start < yslice.stop and yslice.stop <= tile.sizes["y"]
+    xslice_is_valid = xslice.start >= 0 and xslice.start < xslice.stop and xslice.stop <= tile.sizes["x"]
+    if not yslice_is_valid or not xslice_is_valid:
+        logger.error(f"Tile is out of bounds! {yslice=} {xslice=} {tile.sizes=} {zgeobox=}")
+        raise ValueError("Tile is out of bounds!")
+    if yslice.start != 0 or xslice.start != 0 or yslice.stop != tile.sizes["y"] or xslice.stop != tile.sizes["x"]:
+        logger.warning(
+            f"Correcting tile bounds. This is an indicator that the datacube extent is to narrow."
+            f" This will crop the tile to fit the datacube. {yslice=} {xslice=} {tile.sizes=} {zgeobox=}"
+        )
+        tile = tile.isel(x=xslice, y=yslice)
+    return tile
 
 
 class STACAccessor(RemoteAccessor):
@@ -42,7 +95,7 @@ class STACAccessor(RemoteAccessor):
         items = list(search.items())
         return [TileWrapper(item.id, item) for item in items]
 
-    def download_tile(self, zcube: zarr.Array, stac_tile: TileWrapper):
+    def download_tile(self, zcube: zarr.Group, stac_tile: TileWrapper):
         """Download a tile from a STAC API and write it to a zarr datacube.
 
         Args:
@@ -58,13 +111,14 @@ class STACAccessor(RemoteAccessor):
         tile = tile.max("time")
 
         # Get the slice of the datacube where the tile will be written
-        x_start_idx = int((tile.x[0] - zcube["x"][0]) // tile.x.attrs["resolution"])
-        y_start_idx = int((tile.y[0] - zcube["y"][0]) // tile.y.attrs["resolution"])
-        target_slice = TargetSlice(
-            x=slice(x_start_idx, x_start_idx + tile.sizes["x"]),
-            y=slice(y_start_idx, y_start_idx + tile.sizes["y"]),
+        zgeobox = get_geobox_from_zarr(zcube)
+        logger.debug(
+            f"{stac_tile.id=}: {tile.sizes=} {tile.x[0].item()=} {tile.y[0].item()=} {zcube['x'][0]=} {zcube['y'][0]=}"
         )
-        logger.debug(f"Writing {stac_tile.id=} to {target_slice=}")
+        tile = correct_bounds(tile, zgeobox)
+        target_slice = zgeobox.overlap_roi(tile.odc.geobox)
+
+        logger.debug(f"tile.id={stac_tile.id}: Writing to {target_slice=}")
 
         for channel in self.channels:
             raw_data = tile[channel].values

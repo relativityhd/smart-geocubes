@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from typing import NamedTuple, TypedDict
+from typing import TypedDict
 
 import numpy as np
 from numcodecs.abc import Codec
@@ -14,13 +14,6 @@ zarr3blosc_warning = "Numcodecs codecs are not in the Zarr version 3 specificati
 zarr3consolidated_warning = "Consolidated metadata is currently not part in the Zarr format 3 specification. It may not be supported by other zarr implementations and may change in the future."  # noqa: E501
 warnings.filterwarnings("ignore", category=UserWarning, message=zarr3blosc_warning)
 warnings.filterwarnings("ignore", category=UserWarning, message=zarr3consolidated_warning)
-
-
-class TargetSlice(NamedTuple):
-    """NamedTuple for a target slice, used for consistency checks."""
-
-    y: slice
-    x: slice
 
 
 class CoordEncoding(TypedDict):
