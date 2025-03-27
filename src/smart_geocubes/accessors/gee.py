@@ -22,6 +22,14 @@ logger = logging.getLogger(__name__)
 EE_WARN_MSG = "Unable to retrieve 'system:time_start' values from an ImageCollection due to: No 'system:time_start' values found in the 'ImageCollection'."  # noqa: E501
 
 
+def _tileidx_to_id(tileidx: tuple[int, int]) -> str:
+    return "-".join(str(i) for i in tileidx)
+
+
+def _id_to_tileidx(tileid: str) -> tuple[int, int]:
+    return tuple(int(i) for i in tileid.split("-"))
+
+
 class GEEAccessor(RemoteAccessor):
     """Accessor for Google Earth Engine data."""
 
@@ -38,7 +46,7 @@ class GEEAccessor(RemoteAccessor):
 
         """
         tiles = GeoboxTiles(self.extent, (self.chunk_size, self.chunk_size))
-        return [TileWrapper("-".join(idx), tiles[idx]) for idx in tiles.tiles(geobox.extent)]
+        return [TileWrapper(_tileidx_to_id(idx), tiles[idx]) for idx in tiles.tiles(geobox.extent)]
 
     def download_tile(self, zcube: zarr.Group, geobox_tile: TileWrapper):
         """Download a tile from Google Earth Engine.
@@ -51,8 +59,6 @@ class GEEAccessor(RemoteAccessor):
         import ee
         import rioxarray  # noqa: F401
         import xee  # noqa: F401
-
-        yidx, xidx = [int(idx) for idx in geobox_tile.id.split("-")]
 
         # Note: This is a little bit weird: First we create an own grid which overlaps to the chunks
         # of the zarr array. Then we create a mosaic of the data and clip it to a single chunk.
@@ -68,7 +74,7 @@ class GEEAccessor(RemoteAccessor):
                 ee_img,
                 engine="ee",
                 geometry=geom,
-                crs="epsg:4326",
+                crs=f"epsg:{self.extent.crs.to_epsg()}",
                 scale=self.extent.resolution.x,
             )
 
@@ -76,11 +82,17 @@ class GEEAccessor(RemoteAccessor):
         tile = tile.max("time").rename({"lon": "x", "lat": "y"}).transpose("y", "x")
 
         # Download the data
-        tile = tile.compute()
+        tile.load()
         logging.getLogger("urllib3.connectionpool").disabled = False
 
+        # Flip y-axis, because convention is x in positive direction and y in negative, but gee use positive for both
+        tile = tile.isel(y=slice(None, None, -1))
+
+        # For some reason xee does not always set the crs
+        tile = tile.odc.assign_crs(self.extent.crs)
+
         # Recrop the data to the geobox_tile, since gee does not always return the exact extent
-        tile = tile.odc.crop(geobox_tile.extent)
+        tile = tile.odc.crop(geobox_tile.item.extent)
 
         # Save original min-max values for each band for clipping later
         clip_values = {
@@ -88,7 +100,6 @@ class GEEAccessor(RemoteAccessor):
         }
 
         # Interpolate missing values (there are very few, so we actually can interpolate them)
-        tile.rio.write_crs(tile.attrs["crs"], inplace=True)
         tile.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=True)
         for band in tile.data_vars:
             tile[band] = tile[band].rio.write_nodata(np.nan).rio.interpolate_na()
@@ -101,7 +112,8 @@ class GEEAccessor(RemoteAccessor):
         # Get the slice of the datacube where the tile will be written
         zgeobox = self.geobox
         logger.debug(
-            f"{geobox_tile.id=}: {tile.sizes=} {tile.x[0].item()=} {tile.y[0].item()=} {zcube['x'][0]=} {zcube['y'][0]=}"
+            f"{geobox_tile.id=}: {tile.sizes=} {tile.x[0].item()=} {tile.y[0].item()=}"
+            f" {zcube['x'][0]=} {zcube['y'][0]=}"
         )
         target_slice = zgeobox.overlap_roi(tile.odc.geobox)
 
@@ -110,3 +122,27 @@ class GEEAccessor(RemoteAccessor):
         for channel in self.channels:
             raw_data = tile[channel].values
             zcube[channel][target_slice] = raw_data
+
+    def current_state(self) -> "gpd.GeoDataFrame | None":
+        """Get info about currently stored tiles.
+
+        Args:
+            storage (zarr.storage.StoreLike): The zarr storage where the datacube is located.
+
+        Returns:
+            gpd.GeoDataFrame: Tiles from odc.geo.GeoboxTiles. None if datacube is empty.
+
+        """
+        import geopandas as gpd
+
+        session = self.repo.readonly_session("main")
+        zcube = zarr.open(session.store, mode="r")
+        loaded_tiles = zcube.attrs.get("loaded_tiles", [])
+
+        if len(loaded_tiles) == 0:
+            return None
+
+        tiles = GeoboxTiles(self.extent, (self.chunk_size, self.chunk_size))
+        loaded_tiles = [{"geometry": tiles[_id_to_tileidx(tid)].extent.geom, "id": tid} for tid in loaded_tiles]
+        gdf = gpd.GeoDataFrame(loaded_tiles, crs=self.extent.crs.to_wkt())
+        return gdf

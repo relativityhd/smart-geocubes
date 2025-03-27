@@ -19,14 +19,14 @@ Features:
 - [ ] Overall: Add support for temporal axis
 - [ ] Overall: Add support for 3D data
 - [ ] Overall: Add support for 4D data
-- [ ] GEE Accessor
+- [X] GEE Accessor
 - [ ] Widen support for lat-lon data
 - [ ] Support different x-y resolutions
 
 Datasets:
 
 - [ ] ArcticDEM: increase readspeed by using extent files
-- [ ] TCVIS Dataset
+- [X] TCTrend Dataset
 - [ ] S2 Dataset
 - [ ] Landsat Dataset
 
