@@ -1486,7 +1486,7 @@ wheels = [
 
 [[package]]
 name = "mkdocs-git-revision-date-localized-plugin"
-version = "1.4.1"
+version = "1.4.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "babel" },
@@ -1494,9 +1494,9 @@ dependencies = [
     { name = "mkdocs" },
     { name = "pytz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/36/a3/72c60164445bb33ecc5513d1bf2bbf658d78f5254854d5d94692c239cf6a/mkdocs_git_revision_date_localized_plugin-1.4.1.tar.gz", hash = "sha256:364d7c4c45c4f333c750e34bc298ac685a7a8bf9b7b52890d52b2f90f1812c4b", size = 448702 }
+sdist = { url = "https://files.pythonhosted.org/packages/3c/93/3987505121a9b596b05c8a38054b587cfe0d78a1a3e92144204f2c45722b/mkdocs_git_revision_date_localized_plugin-1.4.5.tar.gz", hash = "sha256:9e37f1343d314c9cd8f9cbbf117c4bdc1d2d24a0653c5bbd7059d072f2cd0972", size = 450263 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e4/44/c9d4e6ecb5da8b5f893cd3c5a4c13a487b7296dc872f3647e5ef4192d9b7/mkdocs_git_revision_date_localized_plugin-1.4.1-py3-none-any.whl", hash = "sha256:bb1eca7f156e0c8a587167662923d76efed7f7e0c06b84471aa5ae72a744a434", size = 25102 },
+    { url = "https://files.pythonhosted.org/packages/da/c0/b63cb3008564242a3d1ba7a6dd6dc29d7fb297e65bda93cef655780757af/mkdocs_git_revision_date_localized_plugin-1.4.5-py3-none-any.whl", hash = "sha256:395ae0b9eec565c78a76fffc938b70f52774bf2971245482d31aba47018c5fa9", size = 25284 },
 ]
 
 [[package]]
@@ -2740,7 +2740,7 @@ docs = [
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "mkdocs-api-autonav", specifier = ">=0.2.1" },
     { name = "mkdocs-git-committers-plugin-2", specifier = ">=2.5.0" },
-    { name = "mkdocs-git-revision-date-localized-plugin", specifier = ">=1.4.1" },
+    { name = "mkdocs-git-revision-date-localized-plugin", specifier = ">=1.4.2" },
     { name = "mkdocs-glightbox", specifier = ">=0.4.0" },
     { name = "mkdocs-material", extras = ["imaging"], specifier = ">=9.6.7" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.28.2" },
