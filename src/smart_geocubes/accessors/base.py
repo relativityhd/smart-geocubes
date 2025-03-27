@@ -4,6 +4,7 @@ import logging
 import sys
 import time
 from abc import ABC, abstractmethod
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, NamedTuple, TypedDict, Unpack
 
@@ -12,8 +13,8 @@ import odc.geo
 import odc.geo.xr
 import xarray as xr
 import zarr
-from numcodecs.zarr3 import Blosc
-from odc.geo.geobox import GeoBox
+from odc.geo.geobox import GeoBox, Resolution
+from zarr.codecs import BloscCodec
 from zarr.core.sync import sync
 
 from smart_geocubes.concurrency import AlreadyDownloadedError
@@ -137,6 +138,24 @@ class RemoteAccessor(ABC):
 
             self.threading_handler = ThreadingHandler(self._threading_download)
 
+    # TODO: is this equal to self.extent?
+    @cached_property
+    def geobox(self) -> GeoBox:
+        """Turn a zarr datacube into a GeoBox.
+
+        Returns:
+            GeoBox: The GeoBox created from the zarr datacube.
+
+        """
+        session = self.repo.readonly_session("main")
+        zcube = zarr.open(store=session.store, mode="r")
+        res = Resolution(zcube["x"].attrs.get("resolution"), zcube["y"].attrs.get("resolution"))
+        return GeoBox.from_bbox(
+            (zcube["x"][0], zcube["y"][-1], zcube["x"][-1], zcube["y"][0]),
+            resolution=res,
+            crs=zcube["spatial_ref"].attrs["crs_wkt"],
+        )
+
     def create(self, overwrite: bool = False):
         """Create an empty datacube and write it to the store.
 
@@ -186,7 +205,7 @@ class RemoteAccessor(ABC):
         var_encoding = {
             name: {
                 "chunks": (self.chunk_size, self.chunk_size),
-                "compressors": [Blosc(cname="zstd")],
+                "compressors": [BloscCodec(clevel=9)],
                 **self.channels_encoding[name],
             }
             for name in self.channels

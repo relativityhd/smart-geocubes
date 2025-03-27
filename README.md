@@ -25,12 +25,14 @@ Features:
 
 Datasets:
 
+- [ ] ArcticDEM: increase readspeed by using extent files
 - [ ] TCVIS Dataset
 - [ ] S2 Dataset
 - [ ] Landsat Dataset
 
 Admin:
 
+- [ ] Use StopUhr to measure performance
 - [ ] Write documentation (sphinx or mkdocs)
 - [ ] Add GitHub Action
 - [ ] Publish to PyPy

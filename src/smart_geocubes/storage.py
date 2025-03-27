@@ -5,8 +5,9 @@ import warnings
 from typing import TypedDict
 
 import numpy as np
-from numcodecs.abc import Codec
-from numcodecs.zarr3 import Blosc, Delta, FixedScaleOffset
+from numcodecs.zarr3 import Delta, FixedScaleOffset
+from zarr.abc.codec import BytesBytesCodec
+from zarr.codecs import BloscCodec
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,8 @@ warnings.filterwarnings("ignore", category=UserWarning, message=zarr3consolidate
 class CoordEncoding(TypedDict):
     """TypedDict for the encoding of regularly spaced coordinates."""
 
-    compressors: list[Codec]
-    filters: list[Codec]
+    compressors: list[BytesBytesCodec]
+    filters: list[BytesBytesCodec]
 
 
 def optimize_coord_encoding(values: np.ndarray, dx: int) -> CoordEncoding:
@@ -42,7 +43,7 @@ def optimize_coord_encoding(values: np.ndarray, dx: int) -> CoordEncoding:
 
     offset_codec = FixedScaleOffset(offset=values[0], scale=1 / dx, dtype=values.dtype, astype="<i8")
     delta_codec = Delta(dtype="<i8", astype="<i2")
-    compressor = Blosc(cname="zstd")
+    compressor = BloscCodec()
 
     # Since the update to zarr 3., we can't test the encoding and decoding in a simple maner anymore
     # because they use async operations etc.
