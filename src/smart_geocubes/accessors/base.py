@@ -8,6 +8,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, NamedTuple, TypedDict, Unpack
 
+import geopandas as gpd
 import icechunk
 import odc.geo
 import odc.geo.xr
@@ -22,7 +23,6 @@ from smart_geocubes.storage import optimize_coord_encoding
 
 if TYPE_CHECKING:
     try:
-        import geopandas as gpd
         import matplotlib.pyplot as plt
     except ImportError:
         pass
@@ -156,6 +156,30 @@ class RemoteAccessor(ABC):
             crs=zcube["spatial_ref"].attrs["crs_wkt"],
         )
 
+    @property
+    def created(self) -> bool:
+        """Check if the datacube already exists in the storage.
+
+        Returns:
+            bool: True if the datacube already exists in the storage.
+
+        """
+        session = self.repo.readonly_session("main")
+        return not sync(session.store.is_empty(""))
+
+    def assert_created(self):
+        """Assert that the datacube exists in the storage.
+
+        Raises:
+            FileNotFoundError: If the datacube does not exist.
+
+        """
+        if not self.created:
+            msg = f"Datacube {self.title} does not exist."
+            " Please use the `create` method or pass `create=True` to `load`."
+            logger.error(msg)
+            raise FileNotFoundError(msg)
+
     def create(self, overwrite: bool = False):
         """Create an empty datacube and write it to the store.
 
@@ -231,6 +255,12 @@ class RemoteAccessor(ABC):
         tick_fend = time.perf_counter()
         logger.debug(f"Empty datacube {commit=} created in {tick_fend - tick_fstart:.2f} seconds")
 
+        self.post_create()
+
+    def post_create(self):
+        """Post create actions. Can be overwritten by the dataset accessor."""
+        pass
+
     def load_like(
         self,
         ref: xr.Dataset | xr.DataArray,
@@ -292,6 +322,9 @@ class RemoteAccessor(ABC):
                 self.create(overwrite=False)
             except FileExistsError:  # We are okay if the datacube already exists
                 pass
+        else:
+            # Check if the datacube exists
+            self.assert_created()
 
         # Download the adjacent tiles (if necessary)
         reference_geobox = geobox.to_crs(self.extent.crs, resolution=self.extent.resolution.x).pad(buffer)
@@ -335,8 +368,8 @@ class RemoteAccessor(ABC):
         Raises:
             ValueError: If an unknown concurrency mode is provided.
 
-
         """
+        self.assert_created()
         if concurrency_mode == "blocking":
             self.procedural_download_blocking(geobox)
         elif concurrency_mode == "threading":
@@ -481,6 +514,7 @@ class RemoteAccessor(ABC):
             zarr.Group: The zarr datacube.
 
         """
+        self.assert_created()
         session = self.repo.readonly_session("main")
         zcube = zarr.open(store=session.store, mode="r")
         return zcube
@@ -492,6 +526,7 @@ class RemoteAccessor(ABC):
             xr.Dataset: The xarray datacube.
 
         """
+        self.assert_created()
         session = self.repo.readonly_session("main")
         xcube = xr.open_zarr(session.store, mask_and_scale=False, consolidated=False).set_coords("spatial_ref")
         return xcube
@@ -523,7 +558,7 @@ class RemoteAccessor(ABC):
         """
 
     @abstractmethod
-    def current_state(self) -> "gpd.GeoDataFrame | None":
+    def current_state(self) -> gpd.GeoDataFrame | None:
         """Get info about currently stored tiles / chunk.
 
         Must be implemented by the Accessor.

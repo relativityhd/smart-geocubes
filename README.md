@@ -22,10 +22,11 @@ Features:
 - [X] GEE Accessor
 - [ ] Widen support for lat-lon data
 - [ ] Support different x-y resolutions
+- [ ] True threaded mode: multiple threads for downloading, one thread for writing, multiple for loading
 
 Datasets:
 
-- [ ] ArcticDEM: increase readspeed by using extent files
+- [X] ArcticDEM: increase readspeed by using extent files
 - [X] TCTrend Dataset
 - [ ] S2 Dataset
 - [ ] Landsat Dataset

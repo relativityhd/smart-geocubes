@@ -60,7 +60,7 @@ class TCTrend(GEEAccessor):
         tile_info = self.current_state()
 
         if tile_info is None:
-            raise ValueError("Datacube is not loaded yet. Can't visualize!")
+            raise ValueError("Datacube is not created or loaded yet. Can't visualize!")
 
         # Define the projection
         projection = ccrs.PlateCarree()

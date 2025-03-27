@@ -2,20 +2,14 @@
 
 import logging
 import warnings
-from typing import TYPE_CHECKING
 
+import geopandas as gpd
 import numpy as np
 import xarray as xr
 import zarr
 from odc.geo.geobox import GeoBox, GeoboxTiles
 
 from smart_geocubes.accessors.base import RemoteAccessor, TileWrapper
-
-if TYPE_CHECKING:
-    try:
-        import geopandas as gpd
-    except ImportError:
-        pass
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +117,7 @@ class GEEAccessor(RemoteAccessor):
             raw_data = tile[channel].values
             zcube[channel][target_slice] = raw_data
 
-    def current_state(self) -> "gpd.GeoDataFrame | None":
+    def current_state(self) -> gpd.GeoDataFrame | None:
         """Get info about currently stored tiles.
 
         Args:
@@ -134,6 +128,9 @@ class GEEAccessor(RemoteAccessor):
 
         """
         import geopandas as gpd
+
+        if not self.created:
+            return None
 
         session = self.repo.readonly_session("main")
         zcube = zarr.open(session.store, mode="r")

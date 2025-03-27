@@ -1,10 +1,19 @@
 """Predefined accessor for ArcticDEM 32m, 10m and 2m data."""
 
+import io
+import logging
+import os
+import time
+import zipfile
+from functools import cached_property
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
+import geopandas as gpd
 import numpy as np
 from odc.geo.geobox import GeoBox
 
+from smart_geocubes.accessors.base import TileWrapper
 from smart_geocubes.accessors.stac import STACAccessor
 
 if TYPE_CHECKING:
@@ -12,6 +21,112 @@ if TYPE_CHECKING:
         import matplotlib.pyplot as plt
     except ImportError:
         pass
+
+logger = logging.getLogger(__name__)
+
+
+class LazyStacTileWrapper:
+    """Lazy wrapper for a TileWrapper containing a STAC Item.
+
+    This is necessary since the download function of the STAC accessor expects a
+    TileWrapper object containing a pystac.Item.
+
+    However, creating such a pystac Item always fetches the metadata from the STAC API.
+    For just loading the ArcticDEM data, we don't need this pystac Item.
+    Hence, we create it lazily when it is actually needed.
+    """
+
+    def __init__(self, tile_id: str, stac_file: str):  # noqa: D107
+        self.id = tile_id
+        self.stac_file = stac_file
+
+    def __iter__(self):  # noqa: D105
+        return iter([self.id, self.item])
+
+    @cached_property
+    def item(self):  # noqa: D102
+        import pystac
+
+        return pystac.Item.from_file(self.stac_file)
+
+
+def _download_arcticdem_extent(save_dir: Path):
+    """Download the ArcticDEM mosaic extent info from the provided URL and extracts it to the specified directory.
+
+    Args:
+        save_dir (Path): The directory where the extracted data will be saved.
+
+    Example:
+        ```python
+        from darts_acquisition.arcticdem.datacube import download_arcticdem_extent
+
+        save_dir = Path("data/arcticdem")
+        download_arcticdem_extent(save_dir)
+        ```
+
+        Resulting in the following directory structure:
+
+        ```sh
+        $ tree data/arcticdem
+        data/arcticdem
+        ├── ArcticDEM_Mosaic_Index_v4_1_2m.parquet
+        ├── ArcticDEM_Mosaic_Index_v4_1_10m.parquet
+        └── ArcticDEM_Mosaic_Index_v4_1_32m.parquet
+        ```
+
+    """
+    import requests
+
+    tick_fstart = time.perf_counter()
+    url = "https://data.pgc.umn.edu/elev/dem/setsm/ArcticDEM/indexes/ArcticDEM_Mosaic_Index_latest_gpqt.zip"
+    logger.debug(f"Downloading the arcticdem mosaic extent from {url} to {save_dir.resolve()}")
+    response = requests.get(url)
+
+    # Get the downloaded data as a byte string
+    data = response.content
+
+    tick_download = time.perf_counter()
+    logger.debug(f"Downloaded {len(data)} bytes in {tick_download - tick_fstart:.2f} seconds")
+
+    # Create a bytesIO object
+    with io.BytesIO(data) as buffer:
+        # Create a zipfile.ZipFile object and extract the files to a directory
+        save_dir.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(buffer, "r") as zip_ref:
+            # Get the name of the zipfile (the parent directory)
+            zip_name = zip_ref.namelist()[0].split("/")[0]
+
+            # Extract the files to the specified directory
+            zip_ref.extractall(save_dir)
+
+    # Move the extracted files to the parent directory
+    extracted_dir = save_dir / zip_name
+    for file in extracted_dir.iterdir():
+        file.rename(save_dir / file.name)
+
+    # Remove the empty directory
+    extracted_dir.rmdir()
+
+    tick_extract = time.perf_counter()
+    logger.debug(f"Extraction completed in {tick_extract - tick_download:.2f} seconds")
+    logger.info(
+        f"Download and extraction of the arcticdem mosiac extent from {url} to {save_dir.resolve()}"
+        f"completed in {tick_extract - tick_fstart:.2f} seconds"
+    )
+
+
+def _get_stac_url(dem_id: str) -> str:
+    """Convert the dem_id to a STAC URL.
+
+    Args:
+        dem_id (str): The dem_id of the ArcticDEM data. E.g. "36_24_32m_v4.1"
+
+    Returns:
+        str: The STAC URL of the ArcticDEM data.
+
+    """
+    res = dem_id.split("_")[2]
+    return f"https://stac.pgc.umn.edu/api/v1/collections/arcticdem-mosaics-v4.1-{res}/items/{dem_id}"
 
 
 class ArcticDEMABC(STACAccessor):
@@ -34,6 +149,42 @@ class ArcticDEMABC(STACAccessor):
         "datamask": {"dtype": "bool"},
     }
 
+    @cached_property
+    def _aux_dir(self) -> Path:
+        save_dir = os.environ.get("SMART_GEOCUBES_AUX", None)
+        save_dir = Path(save_dir) if save_dir else Path(__file__).parent.parent / "data"
+        save_dir.mkdir(exist_ok=True)
+        return save_dir
+
+    def post_create(self):
+        """Download the ArcticDEM mosaic extent info and store it in the datacube."""
+        _download_arcticdem_extent(self._aux_dir)
+
+    def adjacent_tiles(self, geobox: GeoBox) -> list[TileWrapper]:
+        """Get adjacent tiles from a STAC API.
+
+        Overwrite the default implementation from the STAC accessor
+        to use pre-downloaded extent files instead of querying the STAC API.
+        This results in a faster loading time, but requires the extent files to be downloaded beforehand.
+        This is done in the post_create step.
+
+        Args:
+            geobox (GeoBox): The geobox for which to get adjacent tiles.
+
+        Returns:
+            list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
+
+        """
+        # Assumes that the extent files are already present and the datacube is already created
+        self.assert_created()
+
+        resolution = int(self.extent.resolution.x)
+        extent_info = gpd.read_parquet(self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{resolution}m.parquet")
+        adjacent_tiles = extent_info.loc[extent_info.intersects(geobox.extent.geom)].copy()
+        if adjacent_tiles.empty:
+            return []
+        return [LazyStacTileWrapper(tile.dem_id, _get_stac_url(tile.dem_id)) for tile in adjacent_tiles.itertuples()]
+
     def visualize_state(self, ax: "plt.Axes | None" = None) -> "plt.Figure | plt.Axes":
         """Visulize the extend, hence the already downloaded and filled data, of the datacube.
 
@@ -55,7 +206,7 @@ class ArcticDEMABC(STACAccessor):
         tile_info = self.current_state()
 
         if tile_info is None:
-            raise ValueError("Datacube is not loaded yet. Can't visualize!")
+            raise ValueError("Datacube is not created or loaded yet. Can't visualize!")
 
         # Define the projection
         projection = ccrs.Stereographic(central_latitude=90, central_longitude=-45, true_scale_latitude=70)

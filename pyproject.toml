@@ -6,6 +6,7 @@ readme = "README.md"
 authors = [{ name = "relativityhd", email = "tobiashoelzer@hotmail.com" }]
 requires-python = ">=3.11"
 dependencies = [
+    "geopandas>=1.0.1",
     "icechunk>=0.2.5,<0.3",
     "numcodecs>=0.15.0,<0.16",
     "numpy>=1.20,<3",
@@ -31,7 +32,6 @@ dask = ["bokeh>=3.6.3", "dask>=2025.1.0", "distributed>=2025.1.0"]
 viz = [
     "cartopy>=0.24.1",
     "folium>=0.19.4",
-    "geopandas>=1.0.1",
     "mapclassify>=2.8.1",
     "matplotlib>=3.10.0",
 ]

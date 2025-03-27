@@ -1,20 +1,14 @@
 """STAC Accessor for Smart Geocubes."""
 
 import logging
-from typing import TYPE_CHECKING
 
+import geopandas as gpd
 import numpy as np
 import xarray as xr
 import zarr
 from odc.geo.geobox import GeoBox, Resolution
 
 from smart_geocubes.accessors.base import RemoteAccessor, TileWrapper
-
-if TYPE_CHECKING:
-    try:
-        import geopandas as gpd
-    except ImportError:
-        pass
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +121,7 @@ class STACAccessor(RemoteAccessor):
             raw_data = np.where(~np.isnan(raw_data), raw_data, zcube[channel][target_slice])
             zcube[channel][target_slice] = raw_data
 
-    def current_state(self) -> "gpd.GeoDataFrame | None":
+    def current_state(self) -> gpd.GeoDataFrame | None:
         """Get info about currently stored tiles.
 
         Args:
@@ -140,6 +134,9 @@ class STACAccessor(RemoteAccessor):
         """
         import geopandas as gpd
         import pystac_client
+
+        if not self.created:
+            return None
 
         session = self.repo.readonly_session("main")
         zcube = zarr.open(session.store, mode="r")
