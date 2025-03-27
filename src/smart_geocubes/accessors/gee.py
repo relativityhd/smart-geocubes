@@ -104,12 +104,11 @@ class GEEAccessor(RemoteAccessor):
             tile[band] = tile[band].clip(band_min, band_max, keep_attrs=True).astype("uint8").rio.write_nodata(None)
 
         # Get the slice of the datacube where the tile will be written
-        zgeobox = self.geobox
         logger.debug(
             f"{geobox_tile.id=}: {tile.sizes=} {tile.x[0].item()=} {tile.y[0].item()=}"
             f" {zcube['x'][0]=} {zcube['y'][0]=}"
         )
-        target_slice = zgeobox.overlap_roi(tile.odc.geobox)
+        target_slice = self.zgeobox.overlap_roi(tile.odc.geobox)
 
         logger.debug(f"tile.id={geobox_tile.id}: Writing to {target_slice=}")
 
@@ -119,9 +118,6 @@ class GEEAccessor(RemoteAccessor):
 
     def current_state(self) -> gpd.GeoDataFrame | None:
         """Get info about currently stored tiles.
-
-        Args:
-            storage (zarr.storage.StoreLike): The zarr storage where the datacube is located.
 
         Returns:
             gpd.GeoDataFrame: Tiles from odc.geo.GeoboxTiles. None if datacube is empty.

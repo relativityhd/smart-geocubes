@@ -11,16 +11,6 @@ edit_uri: edit/main/docs/
 nav:
   - Home: index.md
   - Getting Started: getting_started.md
-  - Reference:
-      - ref.md
-      - Accessors:
-          - ref/accessors/remoteaccessor.md
-          - ref/accessors/stac.md
-      - Datasets:
-          - ref/datasets/arcticdemabc.md
-          - ref/datasets/arcticdem2m.md
-          - ref/datasets/arcticdem10m.md
-          - ref/datasets/arcticdem32m.md
 
 theme:
   name: material
@@ -82,17 +72,27 @@ plugins:
         python:
           paths:
             - 'src'
+          inventories:
+            - https://docs.python.org/3/objects.inv
+            - https://docs.xarray.dev/en/stable/objects.inv
+            - https://numpy.org/doc/stable/objects.inv
           options:
-            members: true
-            inherited_members: true
+            docstring_section_style: list # or "table"
+            docstring_style: 'google'
+            filters: ['!^_']
+            heading_level: 1
+            merge_init_into_class: true
+            parameter_headings: true
+            separate_signature: true
             show_root_heading: true
-            allow_inspection: false
-            heading_level: 2
+            show_signature_annotations: true
             show_symbol_type_heading: true
             show_symbol_type_toc: true
-            group_by_category: true
-            show_category_heading: false
-            show_if_no_docstring: true
+            summary: true
+  - api-autonav:
+      modules: ['src/smart_geocubes']
+  - autorefs:
+      resolve_closest: true
   - privacy:
       enabled: !ENV [CI, false]
   - search:
@@ -116,6 +116,9 @@ extra:
     - icon: fontawesome/brands/github
       name: GitHub
       link: https://github.com/relativityhd/smart-geocubes
+    - icon: fontawesome/brands/python
+      name: PyPI
+      link: https://pypi.org/project/smart-geocubes
   consent:
     title: Cookie consent
     description: >-

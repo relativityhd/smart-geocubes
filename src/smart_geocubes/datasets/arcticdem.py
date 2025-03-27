@@ -3,7 +3,6 @@
 import io
 import logging
 import os
-import time
 import zipfile
 from functools import cached_property
 from pathlib import Path
@@ -12,6 +11,7 @@ from typing import TYPE_CHECKING, ClassVar
 import geopandas as gpd
 import numpy as np
 from odc.geo.geobox import GeoBox
+from stopuhr import stopuhr
 
 from smart_geocubes.accessors.base import TileWrapper
 from smart_geocubes.accessors.stac import STACAccessor
@@ -77,42 +77,36 @@ def _download_arcticdem_extent(save_dir: Path):
     """
     import requests
 
-    tick_fstart = time.perf_counter()
-    url = "https://data.pgc.umn.edu/elev/dem/setsm/ArcticDEM/indexes/ArcticDEM_Mosaic_Index_latest_gpqt.zip"
-    logger.debug(f"Downloading the arcticdem mosaic extent from {url} to {save_dir.resolve()}")
-    response = requests.get(url)
+    with stopuhr("Downloading the ArcticDEM mosaic extent", printer=logger.debug):
+        url = "https://data.pgc.umn.edu/elev/dem/setsm/ArcticDEM/indexes/ArcticDEM_Mosaic_Index_latest_gpqt.zip"
+        logger.debug(f"Downloading the arcticdem mosaic extent from {url} to {save_dir.resolve()}")
+        response = requests.get(url)
 
-    # Get the downloaded data as a byte string
-    data = response.content
+        # Get the downloaded data as a byte string
+        data = response.content
+        logger.debug(f"Downloaded {len(data)} bytes")
 
-    tick_download = time.perf_counter()
-    logger.debug(f"Downloaded {len(data)} bytes in {tick_download - tick_fstart:.2f} seconds")
+    with stopuhr("Extracting the ArcticDEM mosaic extent", printer=logger.debug):
+        # Create a bytesIO object
+        with io.BytesIO(data) as buffer:
+            # Create a zipfile.ZipFile object and extract the files to a directory
+            save_dir.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(buffer, "r") as zip_ref:
+                # Get the name of the zipfile (the parent directory)
+                zip_name = zip_ref.namelist()[0].split("/")[0]
 
-    # Create a bytesIO object
-    with io.BytesIO(data) as buffer:
-        # Create a zipfile.ZipFile object and extract the files to a directory
-        save_dir.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(buffer, "r") as zip_ref:
-            # Get the name of the zipfile (the parent directory)
-            zip_name = zip_ref.namelist()[0].split("/")[0]
+                # Extract the files to the specified directory
+                zip_ref.extractall(save_dir)
 
-            # Extract the files to the specified directory
-            zip_ref.extractall(save_dir)
+        # Move the extracted files to the parent directory
+        extracted_dir = save_dir / zip_name
+        for file in extracted_dir.iterdir():
+            file.rename(save_dir / file.name)
 
-    # Move the extracted files to the parent directory
-    extracted_dir = save_dir / zip_name
-    for file in extracted_dir.iterdir():
-        file.rename(save_dir / file.name)
+        # Remove the empty directory
+        extracted_dir.rmdir()
 
-    # Remove the empty directory
-    extracted_dir.rmdir()
-
-    tick_extract = time.perf_counter()
-    logger.debug(f"Extraction completed in {tick_extract - tick_download:.2f} seconds")
-    logger.info(
-        f"Download and extraction of the arcticdem mosiac extent from {url} to {save_dir.resolve()}"
-        f"completed in {tick_extract - tick_fstart:.2f} seconds"
-    )
+    logger.info(f"Download and extraction of the arcticdem mosiac extent from {url} to {save_dir.resolve()} completed")
 
 
 def _get_stac_url(dem_id: str) -> str:

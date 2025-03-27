@@ -6,35 +6,11 @@ import geopandas as gpd
 import numpy as np
 import xarray as xr
 import zarr
-from odc.geo.geobox import GeoBox, Resolution
+from odc.geo.geobox import GeoBox
 
 from smart_geocubes.accessors.base import RemoteAccessor, TileWrapper
 
 logger = logging.getLogger(__name__)
-
-
-def get_geobox_from_zarr(zcube: zarr.Group) -> GeoBox:
-    """Turn a zarr datacube into a GeoBox.
-
-    Expects the zarr datacube to be created by xarray, hence the following structure and attributes are needed:
-    - Must be a zarr group with at least "x", "y" and "spatial_ref" arrays
-    - "x" and "y" must have a "resolution" attribute
-    - "spatial_ref" must have a "crs_wkt" attribute
-    - "x" and "y" must have at least two values each
-
-    Args:
-        zcube (zarr.Group): The zarr datacube to turn into a GeoBox.
-
-    Returns:
-        GeoBox: The GeoBox created from the zarr datacube.
-
-    """
-    res = Resolution(zcube["x"].attrs.get("resolution"), zcube["y"].attrs.get("resolution"))
-    return GeoBox.from_bbox(
-        (zcube["x"][0], zcube["y"][-1], zcube["x"][-1], zcube["y"][0]),
-        resolution=res,
-        crs=zcube["spatial_ref"].attrs["crs_wkt"],
-    )
 
 
 def correct_bounds(tile: xr.Dataset, zgeobox: GeoBox) -> xr.Dataset:
@@ -105,12 +81,11 @@ class STACAccessor(RemoteAccessor):
         tile = tile.max("time")
 
         # Get the slice of the datacube where the tile will be written
-        zgeobox = get_geobox_from_zarr(zcube)
         logger.debug(
             f"{stac_tile.id=}: {tile.sizes=} {tile.x[0].item()=} {tile.y[0].item()=} {zcube['x'][0]=} {zcube['y'][0]=}"
         )
-        tile = correct_bounds(tile, zgeobox)
-        target_slice = zgeobox.overlap_roi(tile.odc.geobox)
+        tile = correct_bounds(tile, self.zgeobox)
+        target_slice = self.zgeobox.overlap_roi(tile.odc.geobox)
 
         logger.debug(f"tile.id={stac_tile.id}: Writing to {target_slice=}")
 
@@ -123,9 +98,6 @@ class STACAccessor(RemoteAccessor):
 
     def current_state(self) -> gpd.GeoDataFrame | None:
         """Get info about currently stored tiles.
-
-        Args:
-            storage (zarr.storage.StoreLike): The zarr storage where the datacube is located.
 
         Returns:
             gpd.GeoDataFrame: Tile info from pystac. None if datacube is empty.

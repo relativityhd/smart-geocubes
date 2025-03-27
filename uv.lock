@@ -1430,6 +1430,19 @@ wheels = [
 ]
 
 [[package]]
+name = "mkdocs-api-autonav"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mkdocs" },
+    { name = "mkdocstrings-python" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d4/f1/42fa880bda8c519ce673c116bd4e9226d0f89f3a8c2f214aef70b380336d/mkdocs_api_autonav-0.2.1.tar.gz", hash = "sha256:96a893cb5edeffb1ee25d26ce80616bcc3643059bd3c429ae72352011e0e164b", size = 55489 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/7e/fe72268c80464d819fbbbdd3bc6af102acde42e084c69c885a0167de0564/mkdocs_api_autonav-0.2.1-py3-none-any.whl", hash = "sha256:86eb60f2e7a198abe9bcedffc4de67672a978a2adfb57078bd2e2753b0c24f7f", size = 11020 },
+]
+
+[[package]]
 name = "mkdocs-autorefs"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2629,7 +2642,6 @@ wheels = [
 
 [[package]]
 name = "smart-geocubes"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "geopandas" },
@@ -2677,6 +2689,7 @@ dev = [
 docs = [
     { name = "mike" },
     { name = "mkdocs" },
+    { name = "mkdocs-api-autonav" },
     { name = "mkdocs-git-committers-plugin-2" },
     { name = "mkdocs-git-revision-date-localized-plugin" },
     { name = "mkdocs-glightbox" },
@@ -2707,13 +2720,13 @@ requires-dist = [
     { name = "pystac-client", marker = "extra == 'stac'", specifier = ">=0.8.5" },
     { name = "rasterio", marker = "extra == 'gee'", specifier = ">=1.4.3" },
     { name = "rioxarray", marker = "extra == 'gee'", specifier = ">=0.18.2" },
-    { name = "stopuhr", specifier = ">=0.0.1" },
+    { name = "stopuhr", specifier = ">=0.0.3" },
     { name = "xarray", specifier = ">=2025.1.1" },
     { name = "xee", marker = "extra == 'gee'", specifier = ">=0.0.20" },
     { name = "xpystac", marker = "extra == 'stac'", specifier = ">=0.1.3" },
     { name = "zarr", specifier = ">=3,<4" },
 ]
-provides-extras = ["stac", "gee", "dask", "viz"]
+provides-extras = ["dask", "gee", "stac", "viz"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2725,6 +2738,7 @@ dev = [
 docs = [
     { name = "mike", specifier = ">=2.1.3" },
     { name = "mkdocs", specifier = ">=1.6.1" },
+    { name = "mkdocs-api-autonav", specifier = ">=0.2.1" },
     { name = "mkdocs-git-committers-plugin-2", specifier = ">=2.5.0" },
     { name = "mkdocs-git-revision-date-localized-plugin", specifier = ">=1.4.1" },
     { name = "mkdocs-glightbox", specifier = ">=0.4.0" },
@@ -2767,11 +2781,11 @@ wheels = [
 
 [[package]]
 name = "stopuhr"
-version = "0.0.1"
+version = "0.0.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c4/25/7220b03640ca23b22263d3070c8d0ae16276b035fc3d2e24081756b0041e/stopuhr-0.0.1.tar.gz", hash = "sha256:37a2f03e64128bc181fd23633e1f71bd65558d741477797b258522d8a593c365", size = 91909 }
+sdist = { url = "https://files.pythonhosted.org/packages/49/dd/b7d00b5b7a7f10964fd230ee89e3899dd868117dc1cbe13838891a38fdc8/stopuhr-0.0.3.tar.gz", hash = "sha256:d29403625c14967495fcf53583d4be554f390d0f74763decfd70ebbd62eb0aff", size = 91829 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/0d/1bbdea91ce6291f10aa2fb8bb00d393a6207a2f388bdbca512c6f641b119/stopuhr-0.0.1-py3-none-any.whl", hash = "sha256:69e68deeaf1cdde69adeb4de58cccac207e8353ba998f22c518ea389b67157d7", size = 5895 },
+    { url = "https://files.pythonhosted.org/packages/cb/c2/a630a15590cac48f72406e4d4f368604863f258949b319dee363b4559c97/stopuhr-0.0.3-py3-none-any.whl", hash = "sha256:4308108e431f563127ee60091d0f8a31b41d726b0bb7b7bb0b77eb6327114deb", size = 5763 },
 ]
 
 [[package]]

@@ -33,7 +33,7 @@ Datasets:
 
 Admin:
 
-- [ ] Use StopUhr to measure performance
+- [X] Use StopUhr to measure performance
 - [ ] Write documentation (sphinx or mkdocs)
 - [ ] Add GitHub Action
 - [ ] Publish to PyPy
