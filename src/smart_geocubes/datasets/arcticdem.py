@@ -109,17 +109,17 @@ def _download_arcticdem_extent(save_dir: Path):
     logger.info(f"Download and extraction of the arcticdem mosiac extent from {url} to {save_dir.resolve()} completed")
 
 
-def _get_stac_url(dem_id: str) -> str:
+def _get_stac_url(dem_id: str, res: str) -> str:
     """Convert the dem_id to a STAC URL.
 
     Args:
         dem_id (str): The dem_id of the ArcticDEM data. E.g. "36_24_32m_v4.1"
+        res (str): The resolution of the ArcticDEM data. E.g. "32m", "10m", "2m"
 
     Returns:
         str: The STAC URL of the ArcticDEM data.
 
     """
-    res = dem_id.split("_")[2]
     return f"https://stac.pgc.umn.edu/api/v1/collections/arcticdem-mosaics-v4.1-{res}/items/{dem_id}"
 
 
@@ -186,12 +186,15 @@ class ArcticDEMABC(STACAccessor):
         # Assumes that the extent files are already present and the datacube is already created
         self.assert_created()
 
-        resolution = int(self.extent.resolution.x)
-        extent_info = gpd.read_parquet(self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{resolution}m.parquet")
+        resolution = f"{int(self.extent.resolution.x)}m"
+        extent_info = gpd.read_parquet(self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{resolution}.parquet")
         adjacent_tiles = extent_info.loc[extent_info.intersects(geobox.extent.geom)].copy()
         if adjacent_tiles.empty:
             return []
-        return [LazyStacTileWrapper(tile.dem_id, _get_stac_url(tile.dem_id)) for tile in adjacent_tiles.itertuples()]
+        return [
+            LazyStacTileWrapper(tile.dem_id, _get_stac_url(tile.dem_id, resolution))
+            for tile in adjacent_tiles.itertuples()
+        ]
 
     def visualize_state(self, ax: "plt.Axes | None" = None) -> "plt.Figure | plt.Axes":
         """Visulize the extend, hence the already downloaded and filled data, of the datacube.
