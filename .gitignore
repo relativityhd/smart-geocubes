@@ -14,3 +14,6 @@ data
 
 # Playground
 playground.ipynb
+
+# Ruff
+.ruff_cache

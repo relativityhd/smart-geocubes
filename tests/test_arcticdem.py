@@ -7,7 +7,7 @@ import icechunk
 from numpy.testing import assert_almost_equal
 from odc.geo.geobox import GeoBox
 
-from smart_geocubes.datasets.arcticdem import ArcticDEM32m
+from smart_geocubes import ArcticDEM32m
 
 
 def test_arcticdem_download():

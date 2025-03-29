@@ -124,12 +124,26 @@ def _get_stac_url(dem_id: str) -> str:
 
 
 class ArcticDEMABC(STACAccessor):
-    """ABC for Arcticdem data."""
+    """ABC for Arcticdem data.
+
+    Attributes:
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the underlaying zarr array. Should be equal to the extent geobox.
+            However, this property is used to find the target index of the downloaded data, so better save than sorry.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
 
     stac_api_url = "https://stac.pgc.umn.edu/api/v1/"
     chunk_size = 3600
     channels: ClassVar[list] = ["dem", "datamask"]
-    channels_meta: ClassVar[dict] = {
+    _channels_meta: ClassVar[dict] = {
         "dem": {
             "long_name": "Digital Elevation Model",
             "data_source": "ArcticDEM",
@@ -138,7 +152,7 @@ class ArcticDEMABC(STACAccessor):
         },
         "datamask": {"long_name": "Data Mask", "source": "ArcticDEM"},
     }
-    channels_encoding: ClassVar[dict] = {
+    _channels_encoding: ClassVar[dict] = {
         "dem": {"dtype": "float32"},
         "datamask": {"dtype": "bool"},
     }
@@ -253,7 +267,21 @@ class ArcticDEMABC(STACAccessor):
 
 
 class ArcticDEM32m(ArcticDEMABC):
-    """Accessor for ArcticDEM 32m data."""
+    """Accessor for ArcticDEM 32m data.
+
+    Attributes:
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the underlaying zarr array. Should be equal to the extent geobox.
+            However, this property is used to find the target index of the downloaded data, so better save than sorry.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
 
     collection = "arcticdem-mosaics-v4.1-32m"
     # extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=32)
@@ -261,7 +289,21 @@ class ArcticDEM32m(ArcticDEMABC):
 
 
 class ArcticDEM10m(ArcticDEMABC):
-    """Accessor for ArcticDEM 10m data."""
+    """Accessor for ArcticDEM 10m data.
+
+    Attributes:
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the underlaying zarr array. Should be equal to the extent geobox.
+            However, this property is used to find the target index of the downloaded data, so better save than sorry.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
 
     collection = "arcticdem-mosaics-v4.1-10m"
     # extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=10)
@@ -269,7 +311,21 @@ class ArcticDEM10m(ArcticDEMABC):
 
 
 class ArcticDEM2m(ArcticDEMABC):
-    """Accessor for ArcticDEM 2m data."""
+    """Accessor for ArcticDEM 2m data.
+
+    Attributes:
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the underlaying zarr array. Should be equal to the extent geobox.
+            However, this property is used to find the target index of the downloaded data, so better save than sorry.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
 
     collection = "arcticdem-mosaics-v4.1-2m"
     # extent: GeoBox = GeoBox.from_bbox((-3314693.24, -3314693.24, 3314693.24, 3314693.24), "epsg:3413", resolution=2)

@@ -10,10 +10,14 @@ edit_uri: edit/main/docs/
 
 nav:
   - Home: index.md
-  - Getting Started: getting_started.md
+  - Getting Started: examples/quickstart.ipynb
+  - How does it work?: how_it_works.md
+  - Contribute: contribute.md
 
 theme:
   name: material
+  logo: assets/smart-geocubes-logo.png
+  favicon: assets/favicon.ico
   language: en
   custom_dir: docs/overrides
   icon:
@@ -23,7 +27,7 @@ theme:
   palette:
     # Palette toggle for automatic mode
     - media: '(prefers-color-scheme)'
-      primary: lime
+      primary: light-green
       accent: green
       toggle:
         icon: material/brightness-auto
@@ -32,7 +36,7 @@ theme:
     # Palette toggle for light mode
     - scheme: default
       media: '(prefers-color-scheme: light)'
-      primary: lime
+      primary: light-green
       accent: green
       toggle:
         icon: material/brightness-7
@@ -41,7 +45,7 @@ theme:
     # Palette toggle for dark mode
     - scheme: slate
       media: '(prefers-color-scheme: dark)'
-      primary: lime
+      primary: black
       accent: green
       toggle:
         icon: material/brightness-4
@@ -67,6 +71,7 @@ theme:
     - content.code.annotate
 plugins:
   - glightbox
+  - mkdocs-jupyter
   - mkdocstrings:
       handlers:
         python:
@@ -76,6 +81,9 @@ plugins:
             - https://docs.python.org/3/objects.inv
             - https://docs.xarray.dev/en/stable/objects.inv
             - https://numpy.org/doc/stable/objects.inv
+            - https://icechunk.io/en/latest/objects.inv
+            - https://odc-geo.readthedocs.io/en/latest/objects.inv
+            - https://relativityhd.github.io/stopuhr/objects.inv
           options:
             docstring_section_style: list # or "table"
             docstring_style: 'google'
@@ -89,6 +97,7 @@ plugins:
             show_symbol_type_heading: true
             show_symbol_type_toc: true
             summary: true
+            inherited_members: true
   - api-autonav:
       modules: ['src/smart_geocubes']
   - autorefs:
@@ -147,11 +156,15 @@ markdown_extensions:
       pygments_lang_class: true
   - pymdownx.tasklist:
       custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
   - pymdownx.details
   - attr_list
+  - md_in_html
   - admonition
   - tables
   - def_list

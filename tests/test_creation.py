@@ -8,7 +8,7 @@ import xarray as xr
 from numpy.testing import assert_array_equal
 from odc.geo.geobox import GeoBox
 
-from smart_geocubes.accessors.base import RemoteAccessor
+from smart_geocubes.accessors import RemoteAccessor
 
 
 class AccessorDegree(RemoteAccessor):

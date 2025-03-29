@@ -3,7 +3,6 @@
 import logging
 
 import geopandas as gpd
-import numpy as np
 import xarray as xr
 import zarr
 from odc.geo.geobox import GeoBox
@@ -43,7 +42,21 @@ def correct_bounds(tile: xr.Dataset, zgeobox: GeoBox) -> xr.Dataset:
 
 
 class STACAccessor(RemoteAccessor):
-    """Accessor for STAC data."""
+    """Accessor for STAC data.
+
+    Attributes:
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the underlaying zarr array. Should be equal to the extent geobox.
+            However, this property is used to find the target index of the downloaded data, so better save than sorry.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
 
     stac_api_url: str
     collection: str
@@ -65,36 +78,24 @@ class STACAccessor(RemoteAccessor):
         items = list(search.items())
         return [TileWrapper(item.id, item) for item in items]
 
-    def download_tile(self, zcube: zarr.Group, stac_tile: TileWrapper):
+    def download_tile(self, tile: TileWrapper) -> xr.Dataset:
         """Download a tile from a STAC API and write it to a zarr datacube.
 
         Args:
-            zcube (zarr.Array): The zarr datacube to write the tile to.
-            stac_tile (TileWrapper): The tile to download and write.
+            tile (TileWrapper): The tile to download and write.
+
+        Returns:
+            xr.Dataset: The downloaded tile data.
 
         """
         from odc.stac import stac_load
 
-        tile = stac_load([stac_tile.item], bands=self.channels, chunks=None, progress=None)
+        tiledata = stac_load([tile.item], bands=self.channels, chunks=None, progress=None)
 
         # TODO: Allow for multi-temporal datacubes
-        tile = tile.max("time")
+        tiledata = tiledata.max("time")
 
-        # Get the slice of the datacube where the tile will be written
-        logger.debug(
-            f"{stac_tile.id=}: {tile.sizes=} {tile.x[0].item()=} {tile.y[0].item()=} {zcube['x'][0]=} {zcube['y'][0]=}"
-        )
-        tile = correct_bounds(tile, self.zgeobox)
-        target_slice = self.zgeobox.overlap_roi(tile.odc.geobox)
-
-        logger.debug(f"tile.id={stac_tile.id}: Writing to {target_slice=}")
-
-        for channel in self.channels:
-            raw_data = tile[channel].values
-            # Sometimes the data downloaded from stac has nan-borders, which would overwrite existing data
-            # Replace these nan borders with existing data if there is any
-            raw_data = np.where(~np.isnan(raw_data), raw_data, zcube[channel][target_slice])
-            zcube[channel][target_slice] = raw_data
+        return tiledata
 
     def current_state(self) -> gpd.GeoDataFrame | None:
         """Get info about currently stored tiles.

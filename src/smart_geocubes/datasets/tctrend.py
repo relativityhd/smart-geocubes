@@ -14,13 +14,26 @@ if TYPE_CHECKING:
 
 
 class TCTrend(GEEAccessor):
-    """Accessor for TCTrend data."""
+    """Accessor for TCTrend data.
+
+    Attributes:
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the zarr array. Should be equal to the extent geobox.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
 
     collection = "users/ingmarnitze/TCTrend_SR_2000-2019_TCVIS"
     extent = GeoBox.from_bbox((-180, -90, 180, 90), "epsg:4326", resolution=0.00026949458523585647)
     chunk_size = 3600
     channels: ClassVar[list] = ["TCB_slope", "TCG_slope", "TCW_slope"]
-    channels_meta: ClassVar[dict] = {
+    _channels_meta: ClassVar[dict] = {
         "TCB_slope": {
             "long_name": "Tasseled Cap Brightness Trend",
             "data_source": "ee:ingmarnitze/TCTrend_SR_2000-2019_TCVIS",
@@ -34,7 +47,7 @@ class TCTrend(GEEAccessor):
             "data_source": "ee:ingmarnitze/TCTrend_SR_2000-2019_TCVIS",
         },
     }
-    channels_encoding: ClassVar[dict] = {
+    _channels_encoding: ClassVar[dict] = {
         "TCB_slope": {"dtype": "uint8"},
         "TCG_slope": {"dtype": "uint8"},
         "TCW_slope": {"dtype": "uint8"},
