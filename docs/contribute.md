@@ -16,6 +16,9 @@ Features:
 - [ ] Widen support for lat-lon data
 - [ ] Support different x-y resolutions
 - [ ] True threaded mode: multiple threads for downloading, one thread for writing, multiple for loading
+- [X] Predownload data
+  - [X] Interface with geobox
+  - [X] Interface with geopandas: find all intersecting tiles between geopandas and the cubes extent
 
 Datasets:
 

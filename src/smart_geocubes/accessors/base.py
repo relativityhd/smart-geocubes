@@ -358,6 +358,51 @@ class RemoteAccessor(ABC):
                     xrcube_aoi = xrcube_aoi.load()
         return xrcube_aoi
 
+    def download(self, roi: GeoBox | gpd.GeoDataFrame):
+        """Download the data for the given region of interest which can be provided either as GeoBox or GeoDataFrame.
+
+        Args:
+            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe to download the data for.
+
+        Raises:
+            ValueError: If no adjacent tiles are found. This can happen if the geobox is out of the dataset bounds.
+            ValueError: If no tries are left.
+
+        """
+        with self.stopuhr(f"Download of {roi=}"):
+            adjacent_tiles = self.adjacent_tiles(roi)
+            if not adjacent_tiles:
+                logger.error(f"No adjacent tiles found: {adjacent_tiles=}")
+                raise ValueError("No adjacent tiles found - is the provided geobox corrent?")
+
+            session = self.repo.readonly_session("main")
+            zcube = zarr.open(store=session.store, mode="r")
+            loaded_tiles = zcube.attrs.get("loaded_tiles", [])
+            new_tiles = [tile for tile in adjacent_tiles if tile.id not in loaded_tiles]
+            logger.debug(f"{len(adjacent_tiles)=} & {len(loaded_tiles)=} -> {len(new_tiles)=} to download")
+            if not new_tiles:
+                return
+
+            for tile in new_tiles:
+                with self.stopuhr(f"{tile.id=}: Downloading one new tile in blocking mode"):
+                    logger.debug(f"{tile.id=}: Start downloading")
+                    tiledata = self.download_tile(tile)
+
+                # Try to write the data to file until a limit is reached
+                limit = 100
+                for i in range(limit):
+                    try:
+                        self._write_tile_to_zarr(tiledata, tile)
+                        break
+                    except icechunk.ConflictError as conflict_error:
+                        logger.debug(f"{tile.id=}: {conflict_error=} at retry {i}/{limit}")
+                else:
+                    logger.error(
+                        f"{tile.id=}: {limit} tries to write the tile failed. "
+                        "Please check if the datacube is already created and not empty."
+                    )
+                    raise ValueError(f"{tile.id=}: {limit} tries to write the tile failed.")
+
     def procedural_download(self, geobox: GeoBox, concurrency_mode: ConcurrencyModes = "blocking"):
         """Download the data for the given geobox.
 
@@ -377,7 +422,8 @@ class RemoteAccessor(ABC):
         if concurrency_mode == "blocking":
             self.procedural_download_blocking(geobox)
         elif concurrency_mode == "threading":
-            self.procedural_download_threading(geobox)
+            raise ValueError("Threading mode is currently disabled. Use 'blocking' instead.")
+            # self.procedural_download_threading(geobox)
         else:
             raise ValueError(f"Unknown concurrency mode {concurrency_mode}")
 
@@ -555,13 +601,13 @@ class RemoteAccessor(ABC):
         return xcube
 
     @abstractmethod
-    def adjacent_tiles(self, geobox: GeoBox) -> list[TileWrapper]:
+    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
         """Get the adjacent tiles for the given geobox.
 
         Must be implemented by the Accessor.
 
         Args:
-            geobox (GeoBox): The reference geobox to get the adjacent tiles for.
+            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
 
         Returns:
             list[TileWrapper]: The adjacent tile(-id)s for the given geobox.

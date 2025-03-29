@@ -2,6 +2,7 @@
 
 import logging
 import warnings
+from functools import cached_property
 
 import geopandas as gpd
 import numpy as np
@@ -43,18 +44,42 @@ class GEEAccessor(RemoteAccessor):
 
     collection: str
 
-    def adjacent_tiles(self, geobox: GeoBox) -> list[TileWrapper]:
+    @cached_property
+    def _tile_geometries(self) -> gpd.GeoDataFrame:
+        data = [
+            {"idx": idx, "geometry": self._extent_tiles[idx].boundingbox.polygon.geom}
+            for idx in self._extent_tiles._all_tiles()
+        ]
+        return gpd.GeoDataFrame(data, crs=self.extent.crs.to_wkt())
+
+    @cached_property
+    def _extent_tiles(self) -> GeoboxTiles:
+        return GeoboxTiles(self.extent, (self.chunk_size, self.chunk_size))
+
+    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
         """Get adjacent tiles from Google Earth Engine.
 
         Args:
-            geobox (GeoBox): The geobox for which to get adjacent tiles.
+            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
 
         Returns:
             list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
 
         """
-        extent_tiles = GeoboxTiles(self.extent, (self.chunk_size, self.chunk_size))
-        return [TileWrapper(_tileidx_to_id(idx), extent_tiles[idx]) for idx in extent_tiles.tiles(geobox.extent)]
+        if isinstance(roi, gpd.GeoDataFrame):
+            adjacent_geometries = (
+                gpd.sjoin(self._tile_geometries, roi.to_crs(self.extent.crs.wkt), how="inner", predicate="intersects")
+                .reset_index()
+                .drop_duplicates(subset="index", keep="first")
+                .set_index("index")
+            )
+            return [TileWrapper(_tileidx_to_id(idx), self._extent_tiles[idx]) for idx in adjacent_geometries["idx"]]
+
+        elif isinstance(roi, GeoBox):
+            return [
+                TileWrapper(_tileidx_to_id(idx), self._extent_tiles[idx])
+                for idx in self._extent_tiles.tiles(roi.extent)
+            ]
 
     def download_tile(self, zcube: zarr.Group, tile: TileWrapper) -> xr.Dataset:
         """Download a tile from Google Earth Engine.

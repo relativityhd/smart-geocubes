@@ -168,7 +168,7 @@ class ArcticDEMABC(STACAccessor):
         """Download the ArcticDEM mosaic extent info and store it in the datacube."""
         _download_arcticdem_extent(self._aux_dir)
 
-    def adjacent_tiles(self, geobox: GeoBox) -> list[TileWrapper]:
+    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
         """Get adjacent tiles from a STAC API.
 
         Overwrite the default implementation from the STAC accessor
@@ -177,7 +177,7 @@ class ArcticDEMABC(STACAccessor):
         This is done in the post_create step.
 
         Args:
-            geobox (GeoBox): The geobox for which to get adjacent tiles.
+            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
 
         Returns:
             list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
@@ -188,7 +188,20 @@ class ArcticDEMABC(STACAccessor):
 
         resolution = f"{int(self.extent.resolution.x)}m"
         extent_info = gpd.read_parquet(self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{resolution}.parquet")
-        adjacent_tiles = extent_info.loc[extent_info.intersects(geobox.extent.geom)].copy()
+        if isinstance(roi, gpd.GeoDataFrame):
+            adjacent_tiles = (
+                gpd.sjoin(
+                    extent_info,
+                    roi.to_crs(self.extent.crs.wkt),
+                    how="inner",
+                    predicate="intersects",
+                )
+                .reset_index()
+                .drop_duplicates(subset="index", keep="first")
+                .set_index("index")
+            )
+        elif isinstance(roi, GeoBox):
+            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.boundingbox.polygon.geom)].copy()
         if adjacent_tiles.empty:
             return []
         return [

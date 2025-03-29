@@ -61,11 +61,11 @@ class STACAccessor(RemoteAccessor):
     stac_api_url: str
     collection: str
 
-    def adjacent_tiles(self, geobox: GeoBox) -> list[TileWrapper]:
+    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
         """Get adjacent tiles from a STAC API.
 
         Args:
-            geobox (GeoBox): The geobox for which to get adjacent tiles.
+            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
 
         Returns:
             list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
@@ -74,7 +74,8 @@ class STACAccessor(RemoteAccessor):
         import pystac_client
 
         catalog = pystac_client.Client.open(self.stac_api_url)
-        search = catalog.search(collections=[self.collection], intersects=geobox.to_crs("EPSG:4326").extent.geom)
+        geom = roi if isinstance(roi, gpd.GeoDataFrame) else roi.to_crs("EPSG:4326").extent.geom
+        search = catalog.search(collections=[self.collection], intersects=geom)
         items = list(search.items())
         return [TileWrapper(item.id, item) for item in items]
 
