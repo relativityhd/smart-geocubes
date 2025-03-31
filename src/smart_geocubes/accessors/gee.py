@@ -81,11 +81,10 @@ class GEEAccessor(RemoteAccessor):
                 for idx in self._extent_tiles.tiles(roi.extent)
             ]
 
-    def download_tile(self, zcube: zarr.Group, tile: TileWrapper) -> xr.Dataset:
+    def download_tile(self, tile: TileWrapper) -> xr.Dataset:
         """Download a tile from Google Earth Engine.
 
         Args:
-            zcube (zarr.Group): The zarr datacube to download the tile to.
             tile (TileWrapper): The tile to download.
 
         Returns:
