@@ -60,7 +60,11 @@ def _geobox_repr(geobox: GeoBox) -> str:
         str: The string representation of the geobox.
 
     """
-    return f"GeoBox({geobox.shape}, Anchor[{geobox.affine.c} - {geobox.affine.f}], {geobox.crs})"
+    crs = ":".join(geobox.crs.authority)
+    # If the authorizy is unknow set to complete wkt
+    if crs == ":":
+        crs = geobox.crs.wkt
+    return f"GeoBox({geobox.shape}, Anchor[{geobox.affine.c} - {geobox.affine.f}], {crs})"
 
 
 class LoadParams(TypedDict):
@@ -177,6 +181,12 @@ class RemoteAccessor(ABC):
     def created(self) -> bool:  # noqa: D102
         session = self.repo.readonly_session("main")
         return not sync(session.store.is_empty(""))
+
+    @property
+    def loaded_tiles(self) -> list[str]:  # noqa: D102
+        session = self.repo.readonly_session("main")
+        zcube = zarr.open(store=session.store, mode="r")
+        return zcube.attrs["loaded_tiles"].copy()
 
     def assert_created(self):
         """Assert that the datacube exists in the storage.
