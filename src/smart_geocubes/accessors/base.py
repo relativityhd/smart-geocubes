@@ -60,10 +60,8 @@ def _geobox_repr(geobox: GeoBox) -> str:
         str: The string representation of the geobox.
 
     """
-    crs = f"{geobox.crs.authority[0]}:{geobox.crs.authority[1]}"
-    # If the authorizy is unknow set to complete wkt
-    if crs == ":":
-        crs = geobox.crs.wkt
+    crs = f"EPSG:{geobox.crs.epsg}" if geobox.crs.epsg else "Non-EPSG CRS"
+
     return f"GeoBox({geobox.shape}, Anchor[{geobox.affine.c} - {geobox.affine.f}], {crs})"
 
 
