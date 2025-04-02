@@ -60,7 +60,7 @@ def _geobox_repr(geobox: GeoBox) -> str:
         str: The string representation of the geobox.
 
     """
-    crs = ":".join(geobox.crs.authority)
+    crs = f"{geobox.crs.authority[0]}:{geobox.crs.authority[1]}"
     # If the authorizy is unknow set to complete wkt
     if crs == ":":
         crs = geobox.crs.wkt
