@@ -199,16 +199,22 @@ class RemoteAccessor(ABC):
             logger.error(msg)
             raise FileNotFoundError(msg)
 
-    def create(self, overwrite: bool = False):
+    def create(self, overwrite: bool = False, exists_ok: bool = False):
         """Create an empty datacube and write it to the store.
 
         Args:
-            overwrite (bool, optional): Allowing overwriting an existing datacube. Defaults to False.
+            overwrite (bool, optional): Allowing overwriting an existing datacube.
+                Has no effect if exists_ok is True. Defaults to False.
+            exists_ok (bool, optional): Do not raise an error if the datacube already exists.
 
         Raises:
-            FileExistsError: If a datacube already exists at location
+            FileExistsError: If a datacube already exists at location and exists_ok is False.
 
         """
+        if exists_ok and self.created:
+            logger.debug("Datacube was already created.")
+            return
+
         with self.stopuhr("Empty datacube creation"):
             # Check if the zarr data already exists
             session = self.repo.writable_session("main")

@@ -182,6 +182,9 @@ class ArcticDEMABC(STACAccessor):
         Returns:
             list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
 
+        Raises:
+            ValueError: If the roi is not a GeoBox or a GeoDataFrame.
+
         """
         # Assumes that the extent files are already present and the datacube is already created
         self.assert_created()
@@ -192,16 +195,17 @@ class ArcticDEMABC(STACAccessor):
             adjacent_tiles = (
                 gpd.sjoin(
                     extent_info,
-                    roi.to_crs(self.extent.crs.wkt),
+                    roi[["geometry"]].to_crs(self.extent.crs.wkt),
                     how="inner",
                     predicate="intersects",
                 )
                 .reset_index()
-                .drop_duplicates(subset="index", keep="first")
-                .set_index("index")
+                .drop_duplicates(subset="index", keep="first", ignore_index=True)
             )
         elif isinstance(roi, GeoBox):
             adjacent_tiles = extent_info.loc[extent_info.intersects(roi.boundingbox.polygon.geom)].copy()
+        else:
+            raise ValueError("roi must be a GeoBox or a GeoDataFrame")
         if adjacent_tiles.empty:
             return []
         return [
