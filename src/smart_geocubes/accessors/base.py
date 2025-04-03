@@ -383,7 +383,8 @@ class RemoteAccessor(ABC):
             ValueError: If no tries are left.
 
         """
-        with self.stopuhr(f"Download of {roi=}"):
+        roi_repr = _geobox_repr(roi) if isinstance(roi, GeoBox) else "GeoDataframe"
+        with self.stopuhr(f"Download of {roi_repr}"):
             adjacent_tiles = self.adjacent_tiles(roi)
             if not adjacent_tiles:
                 logger.error(f"No adjacent tiles found: {adjacent_tiles=}")
