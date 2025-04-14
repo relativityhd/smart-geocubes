@@ -154,11 +154,17 @@ class RemoteAccessor(ABC):
 
             self._threading_handler = ThreadingHandler(self._threading_download)
 
+        self.post_init()
+
     def __repr__(self):  # noqa: D105
         return f"{self.title}({_geobox_repr(self.extent)}, {self.channels})"
 
     def __str__(self):  # noqa: D105
         return self.__repr__()
+
+    def post_init(self):
+        """Post init actions. Can be overwritten by the dataset accessor."""
+        pass
 
     def log_benchmark_summary(self):
         """Log the benchmark summary."""

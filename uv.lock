@@ -2834,6 +2834,7 @@ gee = [
 ]
 stac = [
     { name = "odc-stac" },
+    { name = "pyarrow" },
     { name = "pystac" },
     { name = "pystac-client" },
     { name = "xpystac" },
@@ -2883,6 +2884,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.20,<3" },
     { name = "odc-geo", specifier = ">=0.4.5,<0.5" },
     { name = "odc-stac", marker = "extra == 'stac'", specifier = ">=0.3.11" },
+    { name = "pyarrow", marker = "extra == 'stac'", specifier = ">=19.0.1" },
     { name = "pystac", marker = "extra == 'stac'", specifier = ">=1.12.1" },
     { name = "pystac-client", marker = "extra == 'stac'", specifier = ">=0.8.5" },
     { name = "rasterio", marker = "extra == 'gee'", specifier = ">=1.4.3" },

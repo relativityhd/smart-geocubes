@@ -31,6 +31,7 @@ Issues = "https://github.com/relativityhd/smart-geocubes/issues"
 [project.optional-dependencies]
 stac = [
     "odc-stac>=0.3.11",
+    "pyarrow>=19.0.1",
     "pystac>=1.12.1",
     "pystac-client>=0.8.5",
     "xpystac>=0.1.3",

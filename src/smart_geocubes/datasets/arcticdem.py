@@ -164,6 +164,12 @@ class ArcticDEMABC(STACAccessor):
         save_dir.mkdir(exist_ok=True)
         return save_dir
 
+    def post_init(self):
+        """Check if the ArcticDEM mosaic extent info is already downloaded and downlaod if not."""
+        required_files = [self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{res}.parquet" for res in ["2m", "10m", "32m"]]
+        if not all(file.exists() for file in required_files):
+            _download_arcticdem_extent(self._aux_dir)
+
     def post_create(self):
         """Download the ArcticDEM mosaic extent info and store it in the datacube."""
         _download_arcticdem_extent(self._aux_dir)
