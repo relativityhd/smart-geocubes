@@ -1,0 +1,25 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Smart Geocubes
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Tobias
+    family-names: Hölzer
+    email: tobiashoelzer@hotmail.com
+identifiers:
+  - type: url
+    value: 'https://github.com/relativityhd/smart-geocubes'
+  - type: doi
+    value: 10.5281/zenodo.15232755
+repository-code: 'https://github.com/relativityhd/smart-geocubes'
+url: 'https://relativityhd.github.io/smart-geocubes'
+abstract: >-
+  A high-performance library for intelligent loading and
+  caching of remote geospatial raster data, built with
+  xarray, zarr and icechunk.
+license: MIT
