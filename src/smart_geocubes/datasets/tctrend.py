@@ -13,8 +13,8 @@ if TYPE_CHECKING:
         pass
 
 
-class TCTrend(GEEAccessor):
-    """Accessor for TCTrend data.
+class TCTrendABC(GEEAccessor):
+    """ABC for TCTrend data.
 
     Attributes:
         extent (GeoBox): The extent of the datacube represented by a GeoBox.
@@ -29,7 +29,6 @@ class TCTrend(GEEAccessor):
 
     """
 
-    collection = "users/ingmarnitze/TCTrend_SR_2000-2019_TCVIS"
     extent = GeoBox.from_bbox((-180, -90, 180, 90), "epsg:4326", resolution=0.00026949458523585647)
     chunk_size = 3600
     channels: ClassVar[list] = ["TCB_slope", "TCG_slope", "TCW_slope"]
@@ -113,3 +112,67 @@ class TCTrend(GEEAccessor):
             return fig
         else:
             return ax
+
+
+class TCTrend2019(TCTrendABC):
+    """Accessor for TCTrend data derived from 2000-2019.
+
+    Attributes:
+        collection (str): The collection ID of the datacube.
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the zarr array. Should be equal to the extent geobox.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
+
+    collection = "users/ingmarnitze/TCTrend_SR_2000-2019_TCVIS"
+
+
+# Aliasing TCTrend2019 to TCTrend for backward compatibility
+TCTrend = TCTrend2019
+
+
+class TCTrend2020(TCTrendABC):
+    """Accessor for TCTrend data derived from 2001-2020.
+
+    Attributes:
+        collection (str): The collection ID of the datacube.
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the zarr array. Should be equal to the extent geobox.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
+
+    collection = "users/ingmarnitze/TCTrend_SR_2001-2020_TCVIS"
+
+
+class TCTrend2022(TCTrendABC):
+    """Accessor for TCTrend data derived from 2003-2022.
+
+    Attributes:
+        collection (str): The collection ID of the datacube.
+        extent (GeoBox): The extent of the datacube represented by a GeoBox.
+        chunk_size (int): The chunk size of the datacube.
+        channels (list): The channels of the datacube.
+        storage (icechunk.Storage): The icechunk storage.
+        repo (icechunk.Repository): The icechunk repository.
+        title (str): The title of the datacube.
+        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
+        zgeobox (GeoBox): The geobox of the zarr array. Should be equal to the extent geobox.
+        created (bool): True if the datacube already exists in the storage.
+
+    """
+
+    collection = "users/ingmarnitze/TCTrend_SR_2003-2022_TCVIS"
