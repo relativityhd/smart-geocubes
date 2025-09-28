@@ -2,7 +2,6 @@
 
 import logging
 import sys
-import time
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
@@ -13,6 +12,7 @@ import icechunk
 import numpy as np
 import odc.geo
 import odc.geo.xr
+import pandas as pd
 import xarray as xr
 import zarr
 from odc.geo.geobox import GeoBox, Resolution
@@ -20,7 +20,7 @@ from stopuhr import StopUhr
 from zarr.codecs import BloscCodec
 from zarr.core.sync import sync
 
-from smart_geocubes._storage import optimize_coord_encoding
+from smart_geocubes._storage import optimize_coord_encoding, optimize_temporal_encoding
 from smart_geocubes.exceptions import AlreadyDownloadedError
 
 if TYPE_CHECKING:
@@ -65,6 +65,13 @@ def _geobox_repr(geobox: GeoBox) -> str:
     return f"GeoBox({geobox.shape}, Anchor[{geobox.affine.c} - {geobox.affine.f}], {crs})"
 
 
+def _check_nanboarder_and_write(raw_data: np.ndarray, zcube: zarr.Array, channel: str, target_slice: tuple[slice, ...]):
+    # Sometimes the data downloaded from stac has nan-borders, which would overwrite existing data
+    # Replace these nan borders with existing data if there is any
+    raw_data = np.where(~np.isnan(raw_data), raw_data, zcube[channel][target_slice])
+    zcube[channel][target_slice] = raw_data
+
+
 class LoadParams(TypedDict):
     """TypedDict for the load function parameters."""
 
@@ -100,6 +107,7 @@ class RemoteAccessor(ABC):
 
     # These class variables (not object properties) are meant to set by a specific dataset accesor
     extent: GeoBox
+    temporal_extent: pd.DatetimeIndex | None
     chunk_size: int
     channels: ClassVar[list]
     _channels_meta: ClassVar[dict]
@@ -171,7 +179,15 @@ class RemoteAccessor(ABC):
         self.stopuhr.summary()
 
     @cached_property
-    def zgeobox(self) -> GeoBox:  # noqa: D102
+    def zgeobox(self) -> GeoBox:
+        """Get the geobox of the underlaying zarr array.
+
+        This should be equal to the extent geobox.
+
+        Returns:
+            GeoBox: The geobox of the underlaying zarr array.
+
+        """
         session = self.repo.readonly_session("main")
         zcube = zarr.open(store=session.store, mode="r")
         res = Resolution(zcube["x"].attrs.get("resolution"), zcube["y"].attrs.get("resolution"))
@@ -182,12 +198,24 @@ class RemoteAccessor(ABC):
         )
 
     @property
-    def created(self) -> bool:  # noqa: D102
+    def created(self) -> bool:
+        """Check if the datacube already exists in the storage.
+
+        Returns:
+            bool: True if the datacube already exists in the storage.
+
+        """
         session = self.repo.readonly_session("main")
         return not sync(session.store.is_empty(""))
 
     @property
-    def loaded_tiles(self) -> list[str]:  # noqa: D102
+    def loaded_tiles(self) -> list[str]:
+        """Get the ids of already (down-)loaded tiles.
+
+        Returns:
+            list[str]: A list of already loaded tile ids.
+
+        """
         session = self.repo.readonly_session("main")
         zcube = zarr.open(store=session.store, mode="r")
         return zcube.attrs["loaded_tiles"].copy()
@@ -204,6 +232,18 @@ class RemoteAccessor(ABC):
             " Please use the `create` method or pass `create=True` to `load`."
             logger.error(msg)
             raise FileNotFoundError(msg)
+
+    def assert_temporal_cube(self):
+        """Assert that the datacube has a temporal dimension.
+
+        Raises:
+            ValueError: If the datacube has no temporal dimension.
+
+        """
+        if self.temporal_extent is None:
+            msg = f"Datacube {self.title} has no temporal dimension."
+            logger.error(msg)
+            raise ValueError(msg)
 
     def create(self, overwrite: bool = False, exists_ok: bool = False):
         """Create an empty datacube and write it to the store.
@@ -248,6 +288,10 @@ class RemoteAccessor(ABC):
                 attrs={"title": self.title, "loaded_tiles": []},
             )
 
+            # Expand to temporal dimension if defined
+            if self.temporal_extent is not None:
+                ds = ds.expand_dims(time=self.temporal_extent)
+
             # Add metadata
             for name, meta in self._channels_meta.items():
                 ds[name].attrs.update(meta)
@@ -257,9 +301,16 @@ class RemoteAccessor(ABC):
                 "x": {"chunks": ds.x.shape, **optimize_coord_encoding(ds.x.values, self.extent.resolution.x)},
                 "y": {"chunks": ds.y.shape, **optimize_coord_encoding(ds.y.values, self.extent.resolution.y)},
             }
+            if self.temporal_extent is not None:
+                coords_encoding["time"] = {"chunks": ds.time.shape, **optimize_temporal_encoding(self.temporal_extent)}
+            chunks = (
+                (1, self.chunk_size, self.chunk_size)
+                if self.temporal_extent is not None
+                else (self.chunk_size, self.chunk_size)
+            )
             var_encoding = {
                 name: {
-                    "chunks": (self.chunk_size, self.chunk_size),
+                    "chunks": chunks,
                     "compressors": [BloscCodec(clevel=9)],
                     **self._channels_encoding[name],
                 }
@@ -320,6 +371,7 @@ class RemoteAccessor(ABC):
     def load(
         self,
         geobox: GeoBox,
+        time: str | slice | None = None,
         buffer: int = 0,
         persist: bool = True,
         create: bool = False,
@@ -329,6 +381,7 @@ class RemoteAccessor(ABC):
 
         Args:
             geobox (GeoBox): The reference geobox to load the data for.
+            time (str | slice | None, optional): The temporal slice to load. Defaults to None.
             buffer (int, optional): The buffer around the projected geobox in pixels. Defaults to 0.
             persist (bool, optional): If the data should be persisted in memory.
                 If not, this will return a Dask backed Dataset. Defaults to True.
@@ -342,6 +395,9 @@ class RemoteAccessor(ABC):
             xr.Dataset: The loaded dataset in the same resolution and extent like the geobox.
 
         """
+        if time is not None:
+            self.assert_temporal_cube()
+
         with self.stopuhr(f"{_geobox_repr(geobox)}: {self.title} tile {'loading' if persist else 'lazy-loading'}"):
             logger.debug(f"{_geobox_repr(geobox)}: {geobox.resolution} original resolution")
 
@@ -357,7 +413,7 @@ class RemoteAccessor(ABC):
 
             # Download the adjacent tiles (if necessary)
             reference_geobox = geobox.to_crs(self.extent.crs, resolution=self.extent.resolution.x).pad(buffer)
-            self.procedural_download(reference_geobox, concurrency_mode=concurrency_mode)
+            self.procedural_download(reference_geobox, time=time, concurrency_mode=concurrency_mode)
 
             # Load the datacube and set the spatial_ref since it is set as a coordinate within the zarr format
             session = self.repo.readonly_session("main")
@@ -369,6 +425,10 @@ class RemoteAccessor(ABC):
                 consolidated=False,
             ).set_coords("spatial_ref")
 
+            # Get temporal slice if time is provided
+            if time is not None:
+                xrcube = xrcube.sel(time=time)
+
             # Get an AOI slice of the datacube
             xrcube_aoi = xrcube.odc.crop(reference_geobox.extent, apply_mask=False)
 
@@ -378,20 +438,24 @@ class RemoteAccessor(ABC):
                     xrcube_aoi = xrcube_aoi.load()
         return xrcube_aoi
 
-    def download(self, roi: GeoBox | gpd.GeoDataFrame):
+    def download(self, roi: GeoBox | gpd.GeoDataFrame, time: str | slice | None = None):
         """Download the data for the given region of interest which can be provided either as GeoBox or GeoDataFrame.
 
         Args:
             roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe to download the data for.
+            time (str | slice | None, optional): The temporal slice to download. Defaults to None.
 
         Raises:
             ValueError: If no adjacent tiles are found. This can happen if the geobox is out of the dataset bounds.
             ValueError: If no tries are left.
 
         """
+        if time is not None:
+            self.assert_temporal_cube()
+
         roi_repr = _geobox_repr(roi) if isinstance(roi, GeoBox) else "GeoDataframe"
         with self.stopuhr(f"Download of {roi_repr}"):
-            adjacent_tiles = self.adjacent_tiles(roi)
+            adjacent_tiles = self.adjacent_tiles(roi, time=time)
             if not adjacent_tiles:
                 logger.error(f"No adjacent tiles found: {adjacent_tiles=}")
                 raise ValueError("No adjacent tiles found - is the provided geobox corrent?")
@@ -424,7 +488,9 @@ class RemoteAccessor(ABC):
                     )
                     raise ValueError(f"{tile.id=}: {limit} tries to write the tile failed.")
 
-    def procedural_download(self, geobox: GeoBox, concurrency_mode: ConcurrencyModes = "blocking"):
+    def procedural_download(
+        self, geobox: GeoBox, time: str | slice | None = None, concurrency_mode: ConcurrencyModes = "blocking"
+    ):
         """Download the data for the given geobox.
 
         Note:
@@ -432,6 +498,7 @@ class RemoteAccessor(ABC):
 
         Args:
             geobox (GeoBox): The reference geobox to download the data for.
+            time (str | slice | None, optional): The temporal slice to download. Defaults to None.
             concurrency_mode (ConcurrencyModes, optional): The concurrency mode for the download.
                 Defaults to "blocking".
 
@@ -439,16 +506,19 @@ class RemoteAccessor(ABC):
             ValueError: If an unknown concurrency mode is provided.
 
         """
+        if time is not None:
+            self.assert_temporal_cube()
+
         self.assert_created()
         if concurrency_mode == "blocking":
-            self.procedural_download_blocking(geobox)
+            self.procedural_download_blocking(geobox, time=time)
         elif concurrency_mode == "threading":
             raise ValueError("Threading mode is currently disabled. Use 'blocking' instead.")
             # self.procedural_download_threading(geobox)
         else:
             raise ValueError(f"Unknown concurrency mode {concurrency_mode}")
 
-    def procedural_download_blocking(self, geobox: GeoBox):
+    def procedural_download_blocking(self, geobox: GeoBox, time: str | slice | None = None):
         """Download tiles procedurally in blocking mode.
 
         Warning:
@@ -459,6 +529,7 @@ class RemoteAccessor(ABC):
 
         Args:
             geobox (GeoBox): The geobox of the aoi to download.
+            time (str | slice | None, optional): The temporal slice to download. Defaults to None.
 
         Raises:
             ValueError: If no adjacent tiles are found. This can happen if the geobox is out of the dataset bounds.
@@ -466,7 +537,7 @@ class RemoteAccessor(ABC):
 
         """
         with self.stopuhr(f"{_geobox_repr(geobox)}: Procedural download in blocking mode"):
-            adjacent_tiles = self.adjacent_tiles(geobox)
+            adjacent_tiles = self.adjacent_tiles(geobox, time=time)
             if not adjacent_tiles:
                 logger.error(f"{_geobox_repr(geobox)}: No adjacent tiles found: {adjacent_tiles=}")
                 raise ValueError("No adjacent tiles found - is the provided geobox corrent?")
@@ -506,6 +577,12 @@ class RemoteAccessor(ABC):
         with self.stopuhr(f"{tile.id=}: Writing tile to zarr"):
             session = self.repo.writable_session("main")
             zcube = zarr.open(store=session.store, mode="r+")
+            xrcube = xr.open_zarr(
+                session.store,
+                mask_and_scale=False,
+                chunks=None,
+                consolidated=False,
+            ).set_coords("spatial_ref")
             loaded_tiles = zcube.attrs.get("loaded_tiles", [])
 
             # Check if the tile was already written from another process, then do nothing
@@ -519,14 +596,47 @@ class RemoteAccessor(ABC):
                 f" {zcube['x'][0]=} {zcube['y'][0]=}"
             )
             target_slice = self.zgeobox.overlap_roi(tiledata.odc.geobox)
+
+            if len(tiledata.dims) == 3:
+                assert "time" in tiledata.dims, f"Expected a temporal dimension 'time' in {tiledata.dims=}"
+                if len(tiledata["time"]) == 1:
+                    timeslice = xrcube.get_index("time").get_loc(tiledata["time"].values[0])  # noqa: PD011
+                else:
+                    logger.warning("Using timeslices in download is experimental. Please report any issues.")
+                    valid_slice = set(xrcube.get_index("time").intersection(tiledata.get_index("time"))) == set(
+                        tiledata.get_index("time")
+                    )
+                    assert valid_slice, (
+                        f"Temporal slice {tiledata.get_index('time')} is not fully contained"
+                        f" in the datacube time index {xrcube.get_index('time')}"
+                    )
+                    timeslice = xrcube.get_index("time").slice_indexer(
+                        tiledata["time"].values[0],  # noqa: PD011
+                        tiledata["time"].values[-1],  # noqa: PD011
+                    )
+                    assert (xrcube.isel(time=timeslice).get_index("time") == tiledata.get_index("time")).all(), (
+                        f"Temporal slice {tiledata.get_index('time')} does not match"
+                        f" the datacube time index {xrcube.isel(time=timeslice).get_index('time')}"
+                    )
+                target_slice = (timeslice, *target_slice)  # Add full slice for temporal dimension
+
             logger.debug(f"{tile.id=}: Writing to {target_slice=}")
 
             for channel in self.channels:
-                raw_data = tiledata[channel].values
+                raw_data = tiledata[channel].values  # noqa: PD011
                 # Sometimes the data downloaded from stac has nan-borders, which would overwrite existing data
                 # Replace these nan borders with existing data if there is any
                 raw_data = np.where(~np.isnan(raw_data), raw_data, zcube[channel][target_slice])
                 zcube[channel][target_slice] = raw_data
+
+            # TODO: Test this!
+            # with ThreadPoolExecutor(max_workers=4) as writer:
+            #     futures = []
+            #     for channel in self.channels:
+            #         raw_data = tiledata[channel].values
+            #         futures.append(writer.submit(_check_nanboarder_and_write, raw_data, zcube, channel, target_slice))
+            #     for future in as_completed(futures):
+            #         future.result()
 
             loaded_tiles.append(tile.id)
             zcube.attrs["loaded_tiles"] = loaded_tiles
@@ -543,7 +653,7 @@ class RemoteAccessor(ABC):
 
         with self.stopuhr(f"{tile.id=}: Downloading one new tile in threading mode"):
             logger.debug(f"{tile.id=}: Start downloading")
-            tiledata = self.download_tile(zcube, tile)
+            tiledata = self.download_tile(tile)
 
         self._write_tile_to_zarr(tiledata, tile)
 
@@ -553,7 +663,7 @@ class RemoteAccessor(ABC):
         commit = session.commit(f"Procedurally downloaded {tile.id=} in threading mode")
         logger.debug(f"{tile.id=}: {commit=}")
 
-    def procedural_download_threading(self, geobox: GeoBox):
+    def procedural_download_threading(self, geobox: GeoBox, time: str | slice | None = None):
         """Download tiles procedurally in threading mode.
 
         Note:
@@ -563,6 +673,7 @@ class RemoteAccessor(ABC):
 
         Args:
             geobox (GeoBox): The geobox of the aoi to download.
+            time (str | slice | None, optional): The temporal slice to download. Defaults to None.
 
         Raises:
             ValueError: If no adjacent tiles are found. This can happen if the geobox is out of the dataset bounds.
@@ -572,7 +683,7 @@ class RemoteAccessor(ABC):
         if not _check_python_version(3, 13):
             raise RuntimeError("Threading mode requires Python 3.13 or higher")
         with self._threading_handler:
-            adjacent_tiles = self.adjacent_tiles(geobox)
+            adjacent_tiles = self.adjacent_tiles(geobox, time=time)
             if not adjacent_tiles:
                 logger.error(f"{_geobox_repr(geobox)}: No adjacent tiles found: {adjacent_tiles=}")
                 raise ValueError("No adjacent tiles found - is the provided geobox corrent?")
@@ -622,13 +733,14 @@ class RemoteAccessor(ABC):
         return xcube
 
     @abstractmethod
-    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
+    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame, time: str | slice | None) -> list[TileWrapper]:
         """Get the adjacent tiles for the given geobox.
 
         Must be implemented by the Accessor.
 
         Args:
             roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            time (str | slice | None): The temporal slice to download.
 
         Returns:
             list[TileWrapper]: The adjacent tile(-id)s for the given geobox.

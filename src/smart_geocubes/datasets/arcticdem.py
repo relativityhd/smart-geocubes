@@ -140,6 +140,7 @@ class ArcticDEMABC(STACAccessor):
 
     """
 
+    temporal_extent = None
     stac_api_url = "https://stac.pgc.umn.edu/api/v1/"
     chunk_size = 3600
     channels: ClassVar[list] = ["dem", "datamask"]
@@ -174,7 +175,7 @@ class ArcticDEMABC(STACAccessor):
         """Download the ArcticDEM mosaic extent info and store it in the datacube."""
         _download_arcticdem_extent(self._aux_dir)
 
-    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
+    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame, time: slice | str | None) -> list[TileWrapper]:
         """Get adjacent tiles from a STAC API.
 
         Overwrite the default implementation from the STAC accessor
@@ -184,6 +185,7 @@ class ArcticDEMABC(STACAccessor):
 
         Args:
             roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            time (str | slice | None): The reference time or time slice. Not used for ArcticDEM.
 
         Returns:
             list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.

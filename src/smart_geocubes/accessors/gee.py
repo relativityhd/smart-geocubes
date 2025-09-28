@@ -5,7 +5,7 @@ import warnings
 from functools import cached_property
 
 import geopandas as gpd
-import numpy as np
+import pandas as pd
 import xarray as xr
 import zarr
 from odc.geo.geobox import GeoBox, GeoboxTiles
@@ -23,6 +23,14 @@ def _tileidx_to_id(tileidx: tuple[int, int]) -> str:
 
 def _id_to_tileidx(tileid: str) -> tuple[int, int]:
     return tuple(int(i) for i in tileid.split("-"))
+
+
+def _timetileidx_to_id(timeidx: int, tileidx: tuple[int, int]) -> str:
+    return f"{timeidx}-" + "-".join(str(i) for i in tileidx)
+
+
+def _id_to_timetileidx(tid: str) -> tuple[int, int, int]:
+    return tuple(int(i) for i in tid.split("-"))
 
 
 class GEEAccessor(RemoteAccessor):
@@ -56,16 +64,24 @@ class GEEAccessor(RemoteAccessor):
     def _extent_tiles(self) -> GeoboxTiles:
         return GeoboxTiles(self.extent, (self.chunk_size, self.chunk_size))
 
-    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
+    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame, time: str | slice | None) -> list[TileWrapper]:
         """Get adjacent tiles from Google Earth Engine.
 
         Args:
             roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            time (str | slice | None): The reference time or time slice
 
         Returns:
             list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
 
+        Raises:
+            ValueError: If the ROI type is invalid.
+            ValueError: If the time is not found in the temporal extent.
+            ValueError: If a time slice is provided, but the datacube has no temporal extent.
+
         """
+        if time is not None and self.temporal_extent is None:
+            raise ValueError("Temporal extent is not defined for this datacube.")
         if isinstance(roi, gpd.GeoDataFrame):
             adjacent_geometries = (
                 gpd.sjoin(self._tile_geometries, roi.to_crs(self.extent.crs.wkt), how="inner", predicate="intersects")
@@ -73,13 +89,30 @@ class GEEAccessor(RemoteAccessor):
                 .drop_duplicates(subset="index", keep="first")
                 .set_index("index")
             )
-            return [TileWrapper(_tileidx_to_id(idx), self._extent_tiles[idx]) for idx in adjacent_geometries["idx"]]
+            geom_idx = list(adjacent_geometries["idx"])
 
         elif isinstance(roi, GeoBox):
+            geom_idx = list(self._extent_tiles.tiles(roi.extent))
+        else:
+            raise ValueError("Invalid ROI type.")
+        if time is None:
+            return [TileWrapper(_tileidx_to_id(idx), self._extent_tiles[idx]) for idx in geom_idx]
+        elif isinstance(time, slice):
+            idxr = self.temporal_extent.slice_indexer(time.start, time.stop)
+            if len(idxr) == 0:
+                raise ValueError(f"Time slice {time} not found in temporal extent.")
+            time_indices = self.temporal_extent[idxr].strftime("%Y%m%d%H%M%S").tolist()
             return [
-                TileWrapper(_tileidx_to_id(idx), self._extent_tiles[idx])
-                for idx in self._extent_tiles.tiles(roi.extent)
+                TileWrapper(_timetileidx_to_id(ti, idx), self._extent_tiles[idx])
+                for ti in time_indices
+                for idx in geom_idx
             ]
+        else:
+            idxr = self.temporal_extent.get_indexer([time])
+            if len(idxr) == 0:
+                raise ValueError(f"Time {time} not found in temporal extent.")
+            time_index = self.temporal_extent[idxr].strftime("%Y%m%d%H%M%S").tolist()[0]
+            return [TileWrapper(_timetileidx_to_id(time_index, idx), self._extent_tiles[idx]) for idx in geom_idx]
 
     def download_tile(self, tile: TileWrapper) -> xr.Dataset:
         """Download a tile from Google Earth Engine.
@@ -102,7 +135,12 @@ class GEEAccessor(RemoteAccessor):
         # of slices etc. like in the stac variant. So for now, we just use the mosaic.
         logging.getLogger("urllib3.connectionpool").disabled = True
         geom = ee.Geometry.Rectangle(tile.item.geographic_extent.boundingbox)
-        ee_img = ee.ImageCollection(self.collection).mosaic().clip(geom)
+        ee_col = ee.ImageCollection(self.collection)
+        if self.temporal_extent is not None:
+            timeidx, _, _ = _id_to_timetileidx(tile.id)
+            time = pd.to_datetime(timeidx, format="%Y%m%d%H%M%S")
+            ee_col = ee_col.filterDate(time)
+        ee_img = ee_col.mosaic().clip(geom)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, message=EE_WARN_MSG)
             tiledata = xr.open_dataset(
@@ -113,8 +151,16 @@ class GEEAccessor(RemoteAccessor):
                 scale=self.extent.resolution.x,
             )
 
-        # TODO: Allow for multi-temporal datacubes and lat/lon coordinates
-        tiledata = tiledata.max("time").rename({"lon": "x", "lat": "y"}).transpose("y", "x")
+        # Do a mosaic if time axis are returned for non-temporal data
+        if "time" in tiledata.dims and self.temporal_extent is None:
+            tiledata = tiledata.max("time")
+
+        tiledata = tiledata.rename({"lon": "x", "lat": "y"})
+        if "time" in tiledata.dims:
+            tiledata["time"] = [time]
+            tiledata = tiledata.transpose("time", "y", "x")
+        else:
+            tiledata = tiledata.transpose("y", "x")
 
         # Download the data
         tiledata.load()
@@ -128,24 +174,6 @@ class GEEAccessor(RemoteAccessor):
 
         # Recrop the data to the tile, since gee does not always return the exact extent
         tiledata = tiledata.odc.crop(tile.item.extent)
-
-        # Save original min-max values for each band for clipping later
-        clip_values = {
-            band: (tiledata[band].min().values.item(), tiledata[band].max().values.item())
-            for band in tiledata.data_vars
-        }
-
-        # Interpolate missing values (there are very few, so we actually can interpolate them)
-        tiledata.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=True)
-        for band in tiledata.data_vars:
-            tiledata[band] = tiledata[band].rio.write_nodata(np.nan).rio.interpolate_na()
-
-        # Convert to uint8
-        for band in tiledata.data_vars:
-            band_min, band_max = clip_values[band]
-            tiledata[band] = (
-                tiledata[band].clip(band_min, band_max, keep_attrs=True).astype("uint8").rio.write_nodata(None)
-            )
 
         return tiledata
 

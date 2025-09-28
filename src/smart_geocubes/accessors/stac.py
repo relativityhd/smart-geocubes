@@ -38,6 +38,7 @@ def correct_bounds(tile: xr.Dataset, zgeobox: GeoBox) -> xr.Dataset:
             f" This will crop the tile to fit the datacube. {yslice=} {xslice=} {tile.sizes=} {zgeobox=}"
         )
         tile = tile.isel(x=xslice, y=yslice)
+    # TODO: do the same for time dimension
     return tile
 
 
@@ -61,11 +62,12 @@ class STACAccessor(RemoteAccessor):
     stac_api_url: str
     collection: str
 
-    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
+    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame, time: str | slice | None) -> list[TileWrapper]:
         """Get adjacent tiles from a STAC API.
 
         Args:
             roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            time (str | slice | None): The reference time or time range.
 
         Returns:
             list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
@@ -73,9 +75,12 @@ class STACAccessor(RemoteAccessor):
         """
         import pystac_client
 
+        if isinstance(time, slice):
+            time = [time.start, time.stop]
+
         catalog = pystac_client.Client.open(self.stac_api_url)
         geom = roi if isinstance(roi, gpd.GeoDataFrame) else roi.to_crs("EPSG:4326").extent.geom
-        search = catalog.search(collections=[self.collection], intersects=geom)
+        search = catalog.search(collections=[self.collection], intersects=geom, datetime=time)
         items = list(search.items())
         return [TileWrapper(item.id, item) for item in items]
 
@@ -93,8 +98,9 @@ class STACAccessor(RemoteAccessor):
 
         tiledata = stac_load([tile.item], bands=self.channels, chunks=None, progress=None)
 
-        # TODO: Allow for multi-temporal datacubes
-        tiledata = tiledata.max("time")
+        # Do a mosaic if multiple items are returned for non-temporal data
+        if "time" in tiledata.dims and self.temporal_extent is None:
+            tiledata = tiledata.max("time")
 
         return tiledata
 

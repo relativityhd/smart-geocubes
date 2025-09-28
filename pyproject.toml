@@ -69,7 +69,13 @@ vcs = "git"
 style = "semver"
 
 [dependency-groups]
-dev = ["ipykernel>=6.29.5", "ipywidgets>=8.1.5", "rich>=13.9.4", "ruff>=0.9.5"]
+dev = [
+    "geemap>=0.36.0",
+    "ipykernel>=6.29.5",
+ "ipywidgets>=8.1.5",
+ "rich>=13.9.4",
+ "ruff>=0.9.5",
+]
 tests = ["pytest>=8.3.4"]
 docs = [
     "mike>=2.1.3",

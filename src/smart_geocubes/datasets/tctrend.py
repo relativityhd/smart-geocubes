@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING, ClassVar
 
+import numpy as np
 from odc.geo.geobox import GeoBox
 
 from smart_geocubes.accessors.gee import GEEAccessor
@@ -30,6 +31,7 @@ class TCTrendABC(GEEAccessor):
     """
 
     extent = GeoBox.from_bbox((-180, -90, 180, 90), "epsg:4326", resolution=0.00026949458523585647)
+    temporal_extent = None
     chunk_size = 3600
     channels: ClassVar[list] = ["TCB_slope", "TCG_slope", "TCW_slope"]
     _channels_meta: ClassVar[dict] = {
@@ -51,6 +53,39 @@ class TCTrendABC(GEEAccessor):
         "TCG_slope": {"dtype": "uint8"},
         "TCW_slope": {"dtype": "uint8"},
     }
+
+    def download_tile(self, tile):
+        """Download a tile from Google Earth Engine.
+
+        Args:
+            tile (TileWrapper): The tile to download.
+
+        Returns:
+            xr.Dataset: The downloaded tile data.
+
+        """
+        tiledata = super().download_tile(tile)
+
+        # ?: The following code handles the occurance of nan values when using mosaics
+        # Save original min-max values for each band for clipping later
+        clip_values = {
+            band: (tiledata[band].min().values.item(), tiledata[band].max().values.item())
+            for band in tiledata.data_vars
+        }
+
+        # Interpolate missing values (there are very few, so we actually can interpolate them)
+        tiledata.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=True)
+        for band in tiledata.data_vars:
+            tiledata[band] = tiledata[band].rio.write_nodata(np.nan).rio.interpolate_na()
+
+        # Convert to uint8
+        for band in tiledata.data_vars:
+            band_min, band_max = clip_values[band]
+            tiledata[band] = (
+                tiledata[band].clip(band_min, band_max, keep_attrs=True).astype("uint8").rio.write_nodata(None)
+            )
+
+        return tiledata
 
     def visualize_state(self, ax: "plt.Axes | None" = None) -> "plt.Figure | plt.Axes":
         """Visulize the extend, hence the already downloaded and filled data, of the datacube.

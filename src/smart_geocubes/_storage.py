@@ -5,6 +5,7 @@ import warnings
 from typing import TypedDict
 
 import numpy as np
+import pandas as pd
 from numcodecs.zarr3 import Delta, FixedScaleOffset
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
@@ -41,6 +42,8 @@ def optimize_coord_encoding(values: np.ndarray, dx: int) -> CoordEncoding:
     # dx = dx_all[0]
     np.testing.assert_allclose(dx_all, dx), "must be regularly spaced"
 
+    # The <i8 and <i2 ensure that the data is stored in little-endian format.
+    # i8 = 64-bit integer, i2 = 16-bit integer
     offset_codec = FixedScaleOffset(offset=values[0], scale=1 / dx, dtype=values.dtype, astype="<i8")
     delta_codec = Delta(dtype="<i8", astype="<i2")
     compressor = BloscCodec()
@@ -59,3 +62,21 @@ def optimize_coord_encoding(values: np.ndarray, dx: int) -> CoordEncoding:
     # np.testing.assert_allclose(values, decoded)
 
     return {"compressors": [compressor], "filters": [offset_codec, delta_codec]}
+
+
+def optimize_temporal_encoding(temporal_extent: pd.DatetimeIndex) -> dict:
+    """Optimize the encoding of temporal data.
+
+    Args:
+        temporal_extent (pd.DatetimeIndex): The temporal extent to encode.
+
+    Returns:
+        dict: A dictionary containing the zarr compressors and filters to use for encoding the temporal data.
+
+    """
+    compressor = BloscCodec()
+    if temporal_extent.freq is None:
+        return {"compressors": [compressor], "filters": []}
+    else:
+        delta_codec = Delta(dtype="int64")
+        return {"compressors": [compressor], "filters": [delta_codec]}
