@@ -95,8 +95,17 @@ class GEEAccessor(RemoteAccessor):
             geom_idx = list(self._extent_tiles.tiles(roi.extent))
         else:
             raise ValueError("Invalid ROI type.")
-        if time is None:
+
+        if self.temporal_extent is None:
             return [TileWrapper(_tileidx_to_id(idx), self._extent_tiles[idx]) for idx in geom_idx]
+
+        # Now datacube is temporal
+        if time is None:
+            return [
+                TileWrapper(_timetileidx_to_id(ti, idx), self._extent_tiles[idx])
+                for ti in self.temporal_extent.strftime("%Y%m%d%H%M%S").tolist()
+                for idx in geom_idx
+            ]
         elif isinstance(time, slice):
             idxr = self.temporal_extent.slice_indexer(time.start, time.stop)
             if len(idxr) == 0:
@@ -163,7 +172,11 @@ class GEEAccessor(RemoteAccessor):
             tiledata = tiledata.transpose("y", "x")
 
         # Download the data
+        tiledata_datatype = type(next(iter(tiledata.data_vars.values()))._variable._data)
+        logger.debug(f"{tile.id=}: Trigger GEE download ({tiledata_datatype=})")
         tiledata.load()
+        tiledata_datatype = type(next(iter(tiledata.data_vars.values()))._variable._data)
+        logger.debug(f"{tile.id=}: Finished GEE download ({tiledata_datatype=})")
         logging.getLogger("urllib3.connectionpool").disabled = False
 
         # Flip y-axis, because convention is x in positive direction and y in negative, but gee use positive for both
@@ -197,6 +210,11 @@ class GEEAccessor(RemoteAccessor):
             return None
 
         tiles = GeoboxTiles(self.extent, (self.chunk_size, self.chunk_size))
-        loaded_tiles = [{"geometry": tiles[_id_to_tileidx(tid)].extent.geom, "id": tid} for tid in loaded_tiles]
+        if self.temporal_extent is not None:
+            loaded_tiles = [
+                {"geometry": tiles[_id_to_timetileidx(tid)[1:]].extent.geom, "id": tid} for tid in loaded_tiles
+            ]
+        else:
+            loaded_tiles = [{"geometry": tiles[_id_to_tileidx(tid)].extent.geom, "id": tid} for tid in loaded_tiles]
         gdf = gpd.GeoDataFrame(loaded_tiles, crs=self.extent.crs.to_wkt())
         return gdf

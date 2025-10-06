@@ -623,11 +623,18 @@ class RemoteAccessor(ABC):
             logger.debug(f"{tile.id=}: Writing to {target_slice=}")
 
             for channel in self.channels:
+                logger.debug(f"{tile.id=}: Writing channel {channel=}")
                 raw_data = tiledata[channel].values  # noqa: PD011
+                logger.debug(f"{tile.id=}: {raw_data.shape=}, {raw_data.dtype=}")
                 # Sometimes the data downloaded from stac has nan-borders, which would overwrite existing data
                 # Replace these nan borders with existing data if there is any
-                raw_data = np.where(~np.isnan(raw_data), raw_data, zcube[channel][target_slice])
+                stored_data = zcube[channel][target_slice]
+                logger.debug(f"{tile.id=}: {stored_data.shape=}, {stored_data.dtype=}")
+                raw_data = np.where(~np.isnan(raw_data), raw_data, stored_data)
+                logger.debug(f"{tile.id=}: {np.isnan(raw_data).sum()=}")
                 zcube[channel][target_slice] = raw_data
+
+            logger.debug(f"{tile.id=}: Finished writing to zarr")
 
             # TODO: Test this!
             # with ThreadPoolExecutor(max_workers=4) as writer:

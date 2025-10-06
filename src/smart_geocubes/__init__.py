@@ -8,6 +8,9 @@ from smart_geocubes.datasets.arcticdem import ArcticDEM2m as ArcticDEM2m
 from smart_geocubes.datasets.arcticdem import ArcticDEM10m as ArcticDEM10m
 from smart_geocubes.datasets.arcticdem import ArcticDEM32m as ArcticDEM32m
 from smart_geocubes.datasets.tctrend import TCTrend as TCTrend
+from smart_geocubes.datasets.tctrend import TCTrend2019 as TCTrend2019
+from smart_geocubes.datasets.tctrend import TCTrend2020 as TCTrend2020
+from smart_geocubes.datasets.tctrend import TCTrend2022 as TCTrend2022
 
 try:
     __version__ = importlib.metadata.version("smart-geocubes")
