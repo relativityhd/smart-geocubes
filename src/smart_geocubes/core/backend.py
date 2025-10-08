@@ -94,9 +94,7 @@ class DownloadBackend(abc.ABC):
         loaded_tiles = zcube.attrs.get("loaded_tiles", [])
         return loaded_tiles
 
-    def _get_target_slice(
-        self, patch: xr.Dataset
-    ) -> tuple[slice[int] | list[int], slice[int], slice[int]] | tuple[slice[int], slice[int]]:
+    def _get_target_slice(self, patch: xr.Dataset) -> tuple[slice | list[int], slice, slice] | tuple[slice, slice]:
         xcube = self.open_xarray()
         _log_xcube_stats(xcube, "Target xcube")
 

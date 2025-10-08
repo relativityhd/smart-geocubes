@@ -1,17 +1,27 @@
-from dataclasses import dataclass
+"""Metadata for a single patch in a data cube."""
 
-from odc.geo.geobox import GeoBox
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Generic, TypeVar
+
+from odc.geo.geom import Geometry
+
+PatchItem = TypeVar("PatchItem")
 
 
 @dataclass
-class PatchIndex:
+class PatchIndex(Generic[PatchItem]):
     """Metadata for a single patch in a data cube."""
 
     """Unique identifier for the patch."""
     id: str
 
-    """The GeoBox defining the spatial extent and resolution of the patch."""
-    geobox: GeoBox
+    # TODO: check weather geobox and time should be deleted?
+    """The Geometry defining the spatial extent in EPSG:4326."""
+    geometry: Geometry
 
-    """The time range (start, end) or time stamp defining the temporal extent of the patch."""
-    time_range: tuple[str, str] | None = None
+    """The time of the patch, if applicable."""
+    time: tuple[str, str] | tuple[datetime, datetime] | str | datetime | None = None
+
+    """An associated item or metadata object useful for other operations."""
+    item: PatchItem | None = None

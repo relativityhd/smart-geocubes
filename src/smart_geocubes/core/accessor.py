@@ -135,6 +135,16 @@ class RemoteAccessor(ABC):
         return self.__repr__()
 
     @property
+    def is_temporal(self) -> bool:
+        """Check if the datacube has a temporal dimension.
+
+        Returns:
+            bool: True if the datacube has a temporal dimension.
+
+        """
+        return self.temporal_extent is not None
+
+    @property
     def created(self) -> bool:
         """Check if the datacube already exists in the storage.
 

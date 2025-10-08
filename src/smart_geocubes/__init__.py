@@ -18,9 +18,13 @@ except importlib.metadata.PackageNotFoundError:
     __version__ = "0.0.0"
 
 __all__ = [
+    "AlphaEarthEmbeddings",
     "ArcticDEM2m",
     "ArcticDEM10m",
     "ArcticDEM32m",
     "TCTrend",
+    "TCTrend2019",
+    "TCTrend2020",
+    "TCTrend2022",
     "accessors",
 ]

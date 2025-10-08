@@ -42,6 +42,29 @@ def normalize_toi(extent: pd.DatetimeIndex, toi: TOI, method="nearest") -> pd.Da
     return toi_norm
 
 
+def extract_toi_range(toi: TOI) -> str | datetime | tuple[str, str] | tuple[datetime | datetime] | None:
+    """Extract the datetime range or a specific datetime from the time of interest (toi).
+
+    Args:
+        toi (TOI): The time of interest.
+
+    Returns:
+        str | datetime | tuple[str, str] | tuple[datetime, datetime] | None: The extracted datetime or datetime range.
+
+    Raises:
+        ValueError: If the time of interest is of an invalid type.
+
+    """
+    if toi is None or isinstance(toi, str | datetime):
+        return toi
+    elif isinstance(toi, pd.Timestamp):
+        return toi.to_pydatetime()
+    elif isinstance(toi, slice):
+        return toi.start, toi.stop
+    else:
+        raise ValueError(f"Cannot extract range from toi of type {type(toi)}.")
+
+
 def _repr_toi(toi: TOI) -> str:
     """Get a string representation of the time of interest.
 

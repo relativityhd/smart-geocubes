@@ -3,9 +3,11 @@
 from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
+import xarray as xr
 from odc.geo.geobox import GeoBox
 
-from smart_geocubes.accessors.gee import GEEAccessor
+from smart_geocubes.accessors import GEEMosaicAccessor
+from smart_geocubes.core import PatchIndex
 
 if TYPE_CHECKING:
     try:
@@ -14,7 +16,7 @@ if TYPE_CHECKING:
         pass
 
 
-class TCTrendABC(GEEAccessor):
+class TCTrendABC(GEEMosaicAccessor):
     """ABC for TCTrend data.
 
     Attributes:
@@ -54,38 +56,37 @@ class TCTrendABC(GEEAccessor):
         "TCW_slope": {"dtype": "uint8"},
     }
 
-    def download_tile(self, tile):
-        """Download a tile from Google Earth Engine.
+    def download_patch(self, idx: PatchIndex) -> xr.Dataset:
+        """Download the data for the given patch.
+
+        Must be implemented by the Accessor.
 
         Args:
-            tile (TileWrapper): The tile to download.
+            idx (PatchIndex): The reference patch to download the data for.
 
         Returns:
-            xr.Dataset: The downloaded tile data.
+            xr.Dataset: The downloaded patch data.
 
         """
-        tiledata = super().download_tile(tile)
+        patch = super().download_patch(idx)
 
         # ?: The following code handles the occurance of nan values when using mosaics
         # Save original min-max values for each band for clipping later
         clip_values = {
-            band: (tiledata[band].min().values.item(), tiledata[band].max().values.item())
-            for band in tiledata.data_vars
+            band: (patch[band].min().values.item(), patch[band].max().values.item()) for band in patch.data_vars
         }
 
         # Interpolate missing values (there are very few, so we actually can interpolate them)
-        tiledata.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=True)
-        for band in tiledata.data_vars:
-            tiledata[band] = tiledata[band].rio.write_nodata(np.nan).rio.interpolate_na()
+        patch.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=True)
+        for band in patch.data_vars:
+            patch[band] = patch[band].rio.write_nodata(np.nan).rio.interpolate_na()
 
         # Convert to uint8
-        for band in tiledata.data_vars:
+        for band in patch.data_vars:
             band_min, band_max = clip_values[band]
-            tiledata[band] = (
-                tiledata[band].clip(band_min, band_max, keep_attrs=True).astype("uint8").rio.write_nodata(None)
-            )
+            patch[band] = patch[band].clip(band_min, band_max, keep_attrs=True).astype("uint8").rio.write_nodata(None)
 
-        return tiledata
+        return patch
 
     def visualize_state(self, ax: "plt.Axes | None" = None) -> "plt.Figure | plt.Axes":
         """Visulize the extend, hence the already downloaded and filled data, of the datacube.
