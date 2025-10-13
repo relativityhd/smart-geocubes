@@ -13,6 +13,7 @@ import pandas as pd
 import xarray as xr
 import zarr
 from odc.geo.geobox import GeoBox
+from odc.geo.geom import Geometry
 from stopuhr import StopUhr
 from zarr.codecs import BloscCodec
 from zarr.core.sync import sync
@@ -21,7 +22,7 @@ from smart_geocubes.backends import SimpleBackend, ThreadedBackend
 from smart_geocubes.core.patches import PatchIndex
 from smart_geocubes.core.storage import optimize_coord_encoding, optimize_temporal_encoding
 from smart_geocubes.core.toi import TOI, _repr_toi
-from smart_geocubes.core.utils import _check_python_version, _geobox_repr
+from smart_geocubes.core.utils import _check_python_version, _geobox_repr, _geometry_repr
 
 if TYPE_CHECKING:
     try:
@@ -329,18 +330,17 @@ class RemoteAccessor(ABC):
 
     def load(
         self,
-        aoi: GeoBox,
+        aoi: Geometry | GeoBox,
         toi: TOI = None,
-        buffer: int = 0,
         persist: bool = True,
         create: bool = False,
     ) -> xr.Dataset:
         """Load the data for the given geobox.
 
         Args:
-            aoi (GeoBox): The reference geobox to load the data for.
+            aoi (Geometry | GeoBox): The reference geometry to load the data for. If a Geobox is provided,
+                it will use the extent of the geobox.
             toi (TOI): The temporal slice to load. Defaults to None.
-            buffer (int, optional): The buffer around the projected geobox in pixels. Defaults to 0.
             persist (bool, optional): If the data should be persisted in memory.
                 If not, this will return a Dask backed Dataset. Defaults to True.
             create (bool, optional): Create a new zarr array at defined storage if it not exists.
@@ -354,9 +354,10 @@ class RemoteAccessor(ABC):
         if toi is not None:
             self.assert_temporal_cube()
 
-        with self.stopuhr(f"{_geobox_repr(aoi)}: {self.title} tile {'loading' if persist else 'lazy-loading'}"):
-            logger.debug(f"{_geobox_repr(aoi)}: {aoi.resolution} original resolution")
+        if isinstance(aoi, GeoBox):
+            aoi = aoi.extent
 
+        with self.stopuhr(f"{_geometry_repr(aoi)}: {self.title} tile {'loading' if persist else 'lazy-loading'}"):
             # Create the datacube if it does not exist
             if create:
                 try:
@@ -368,9 +369,8 @@ class RemoteAccessor(ABC):
                 self.assert_created()
 
             # Download the adjacent tiles (if necessary)
-            reference_geobox = aoi.to_crs(self.extent.crs, resolution=self.extent.resolution.x).pad(buffer)
-
-            with self.stopuhr(f"{_geobox_repr(aoi)}: Procedural download in blocking mode"):
+            reference_geobox = aoi.to_crs(self.extent.crs)
+            with self.stopuhr(f"{_geometry_repr(aoi)}: Procedural download in blocking mode"):
                 self.procedural_download(reference_geobox, toi)
 
             # Load the datacube and set the spatial_ref since it is set as a coordinate within the zarr format
@@ -392,11 +392,11 @@ class RemoteAccessor(ABC):
 
             # The following code would load the lazy zarr data from disk into memory
             if persist:
-                with self.stopuhr(f"{_geobox_repr(aoi)}: {self.title} AOI loading from disk"):
+                with self.stopuhr(f"{_geometry_repr(aoi)}: {self.title} AOI loading from disk"):
                     xrcube_aoi = xrcube_aoi.load()
         return xrcube_aoi
 
-    def procedural_download(self, aoi: GeoBox, toi: TOI):
+    def procedural_download(self, aoi: Geometry, toi: TOI):
         """Download tiles procedurally.
 
         Warning:
@@ -406,7 +406,7 @@ class RemoteAccessor(ABC):
             In such cases, the download will be retried until it succeeds or the number of maximum-tries is reached.
 
         Args:
-            aoi (GeoBox): The geobox of the aoi to download.
+            aoi (Geometry): The geometry of the aoi to download.
             toi (TOI): The time of interest to download.
 
         Raises:
@@ -416,7 +416,7 @@ class RemoteAccessor(ABC):
         """
         adjacent_patches = self.adjacent_patches(aoi, toi)
         # interest-string
-        soi = f"{_geobox_repr(aoi)}" + (f" @ {_repr_toi(toi)}" if toi is not None else "")
+        soi = f"{_geometry_repr(aoi)}" + (f" @ {_repr_toi(toi)}" if toi is not None else "")
         if not adjacent_patches:
             logger.error(f"{soi}: No adjacent patches found: {adjacent_patches=}")
             raise ValueError("No adjacent patches found - is the provided aoi and toi correct?")
@@ -433,13 +433,13 @@ class RemoteAccessor(ABC):
         self.backend.submit(new_patches)
 
     @abstractmethod
-    def adjacent_patches(self, roi: GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex]:
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex]:
         """Get the adjacent patches for the given geobox.
 
         Must be implemented by the Accessor.
 
         Args:
-            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            roi (Geometry | GeoBox | gpd.GeoDataFrame): The reference geometry, geobox or reference geodataframe
             toi (TOI): The time of interest to download.
 
         Returns:

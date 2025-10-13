@@ -3,6 +3,7 @@ import sys
 
 import xarray as xr
 from odc.geo.geobox import GeoBox
+from odc.geo.geom import Geometry
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +25,6 @@ def _check_python_version(min_major: int, min_minor: int) -> bool:
 
 
 def _geobox_repr(geobox: GeoBox) -> str:
-    """Get a better string representation of a geobox.
-
-    Args:
-        geobox (GeoBox): The geobox to represent.
-
-    Returns:
-        str: The string representation of the geobox.
-
-    """
     crs = f"EPSG:{geobox.crs.epsg}" if geobox.crs.epsg else "Non-EPSG CRS"
 
     is_degrees = geobox.crs.units[0].startswith("degree")
@@ -46,6 +38,22 @@ def _geobox_repr(geobox: GeoBox) -> str:
         res = f"{abs(geobox.affine.a)} x {abs(geobox.affine.e)}"
 
     return f"GeoBox({geobox.shape}, {res} @ [{geobox.affine.c}, {geobox.affine.f}] in {crs})"
+
+
+def _geometry_repr(geometry: Geometry) -> str:
+    crs = f"EPSG:{geometry.crs.epsg}" if geometry.crs.epsg else "Non-EPSG CRS"
+
+    is_degrees = geometry.crs.units[0].startswith("degree")
+    is_meter = geometry.crs.units[0].startswith("metre") or geometry.crs.units[0].startswith("meter")
+
+    center = geometry.centroid
+    if is_meter:
+        center_str = f"({center.x:.1f}m, {center.y:.1f}m)"
+    elif is_degrees:
+        center_str = f"({center.x:.5f}°, {center.y:.5f}°)"
+    else:
+        center_str = f"({center.x}, {center.y})"
+    return f"Geometry({center_str} in {crs})"
 
 
 def _log_xcube_stats(xcube: xr.Dataset, prefix: str = "xcube"):

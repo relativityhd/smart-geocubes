@@ -66,17 +66,20 @@ class STACAccessor(RemoteAccessor):
     stac_api_url: str
     collection: str
 
-    def adjacent_patches(self, roi: GeoBox | gpd.GeoDataFrame, toi: TOI | None) -> list[PatchIndex["Item"]]:
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI | None) -> list[PatchIndex["Item"]]:
         """Get the adjacent patches for the given geobox.
 
         Must be implemented by the Accessor.
 
         Args:
-            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            roi (Geometry | GeoBox | gpd.GeoDataFrame): The reference geometry, geobox or reference geodataframe
             toi (TOI): The time of interest to download.
 
         Returns:
             list[PatchIndex[Item]]: The adjacent patch(-id)s for the given geobox.
+
+        Raises:
+            ValueError: If the ROI type is invalid.
 
         """
         import pystac_client
@@ -85,7 +88,15 @@ class STACAccessor(RemoteAccessor):
             toi = extract_toi_range(self.temporal_extent, toi)
 
         catalog = pystac_client.Client.open(self.stac_api_url)
-        geom = roi if isinstance(roi, gpd.GeoDataFrame) else roi.to_crs("EPSG:4326").extent.geom
+        if isinstance(roi, gpd.GeoDataFrame):
+            geom = roi
+        elif isinstance(roi, GeoBox):
+            geom = roi.to_crs("EPSG:4326").extent.geom
+        elif isinstance(roi, Geometry):
+            geom = roi.to_crs("EPSG:4326").geom
+        else:
+            raise ValueError("Invalid ROI type.")
+
         search = catalog.search(collections=[self.collection], intersects=geom, datetime=toi)
         items = list(search.items())
 

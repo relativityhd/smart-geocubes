@@ -9,6 +9,7 @@ import geopandas as gpd
 import pandas as pd
 import xarray as xr
 from odc.geo.geobox import GeoBox, GeoboxTiles
+from odc.geo.geom import Geometry
 
 from smart_geocubes.core import TOI, PatchIndex, RemoteAccessor, normalize_toi
 
@@ -74,13 +75,13 @@ class GEEMosaicAccessor(RemoteAccessor):
         else:
             raise ValueError(f"Invalid index string: {idx}")
 
-    def adjacent_patches(self, roi: GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex[Item]]:
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[Item]:
         """Get the adjacent patches for the given geobox.
 
         Must be implemented by the Accessor.
 
         Args:
-            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            roi (Geometry | GeoBox | gpd.GeoDataFrame): The reference geometry, geobox or reference geodataframe
             toi (TOI): The time of interest to download.
 
         Returns:
@@ -104,6 +105,8 @@ class GEEMosaicAccessor(RemoteAccessor):
             spatial_idxs: list[tuple[int, int]] = list(adjacent_geometries["idx"])
         elif isinstance(roi, GeoBox):
             spatial_idxs: list[tuple[int, int]] = list(self._extent_tiles.tiles(roi.extent))
+        elif isinstance(roi, Geometry):
+            spatial_idxs: list[tuple[int, int]] = list(self._extent_tiles.tiles(roi))
         else:
             raise ValueError("Invalid ROI type.")
 

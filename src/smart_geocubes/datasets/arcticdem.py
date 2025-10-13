@@ -183,7 +183,7 @@ class ArcticDEMABC(STACAccessor):
         """Download the ArcticDEM mosaic extent info and store it in the datacube."""
         _download_arcticdem_extent(self._aux_dir)
 
-    def adjacent_patches(self, roi: GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex]:
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex]:
         """Get adjacent patch indexes from a STAC API.
 
         Overwrite the default implementation from the STAC accessor
@@ -192,7 +192,7 @@ class ArcticDEMABC(STACAccessor):
         This is done in the post_create step.
 
         Args:
-            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            roi (Geometry | GeoBox | gpd.GeoDataFrame): The reference geometry, geobox or reference geodataframe
             toi (TOI): The time of interest to download.
                 Not used in this implementation since ArcticDEM is not temporal.
 
@@ -221,6 +221,8 @@ class ArcticDEMABC(STACAccessor):
             )
         elif isinstance(roi, GeoBox):
             adjacent_tiles = extent_info.loc[extent_info.intersects(roi.boundingbox.polygon.geom)].copy()
+        elif isinstance(roi, Geometry):
+            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.geom)].copy()
         else:
             raise ValueError("roi must be a GeoBox or a GeoDataFrame")
         if adjacent_tiles.empty:
