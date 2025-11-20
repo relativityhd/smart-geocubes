@@ -163,4 +163,6 @@ class ThreadedBackend(DownloadBackend):
             raise RuntimeError(
                 "Write queue is not alive. This happens if the writer thread crashes or the backend is closed."
             )
-        self.write_queue.all_tasks_done.wait()
+        with self.write_queue.mutex:
+            self.write_queue.all_tasks_done.wait()
+        logger.debug("All submitted patches downloaded and written.")
