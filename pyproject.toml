@@ -10,8 +10,8 @@ dependencies = [
     "icechunk>=1.1,<2",
     "numpy>=2.0.0,<3",
     "odc-geo>=0.4.5,<0.5",
-    "stopuhr>=0.0.10",
-    "xarray>=2025.1.0",
+    "stopuhr>=0.0.3",
+    "xarray>=2025.1.1",
     "zarr>=3.1,<4",
 ]
 license = "MIT"
