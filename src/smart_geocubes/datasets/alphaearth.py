@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, ClassVar
 import pandas as pd
 from odc.geo.geobox import GeoBox
 
-from smart_geocubes.accessors.gee import GEEAccessor
+from smart_geocubes.accessors import GEEMosaicAccessor
 
 if TYPE_CHECKING:
     try:
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
         pass
 
 
-class AlphaEarthEmbeddings(GEEAccessor):
+class AlphaEarthEmbeddings(GEEMosaicAccessor):
     """Accessor for AlphaEarth Embeddings data.
 
     Attributes:

@@ -11,10 +11,11 @@ from typing import TYPE_CHECKING, ClassVar
 import geopandas as gpd
 import numpy as np
 from odc.geo.geobox import GeoBox
+from odc.geo.geom import Geometry
 from stopuhr import stopuhr
 
-from smart_geocubes.accessors.base import TileWrapper
 from smart_geocubes.accessors.stac import STACAccessor
+from smart_geocubes.core import TOI, PatchIndex
 
 if TYPE_CHECKING:
     try:
@@ -25,8 +26,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class LazyStacTileWrapper:
-    """Lazy wrapper for a TileWrapper containing a STAC Item.
+class LazyStacPatchIndex:
+    """Lazy wrapper for a PatchIndex containing a STAC Item.
 
     This is necessary since the download function of the STAC accessor expects a
     TileWrapper object containing a pystac.Item.
@@ -36,9 +37,12 @@ class LazyStacTileWrapper:
     Hence, we create it lazily when it is actually needed.
     """
 
-    def __init__(self, tile_id: str, stac_file: str):  # noqa: D107
-        self.id = tile_id
+    def __init__(self, patch_id: str, stac_file: str):  # noqa: D107
+        self.id = patch_id
         self.stac_file = stac_file
+
+        # time is not used
+        self.time = None
 
     def __iter__(self):  # noqa: D105
         return iter([self.id, self.item])
@@ -48,6 +52,10 @@ class LazyStacTileWrapper:
         import pystac
 
         return pystac.Item.from_file(self.stac_file)
+
+    @cached_property
+    def geometry(self):  # noqa: D102
+        return Geometry(self.item.geometry, crs="EPSG:4326")
 
 
 def _download_arcticdem_extent(save_dir: Path):
@@ -175,8 +183,8 @@ class ArcticDEMABC(STACAccessor):
         """Download the ArcticDEM mosaic extent info and store it in the datacube."""
         _download_arcticdem_extent(self._aux_dir)
 
-    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame, time: slice | str | None) -> list[TileWrapper]:
-        """Get adjacent tiles from a STAC API.
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex]:
+        """Get adjacent patch indexes from a STAC API.
 
         Overwrite the default implementation from the STAC accessor
         to use pre-downloaded extent files instead of querying the STAC API.
@@ -184,11 +192,12 @@ class ArcticDEMABC(STACAccessor):
         This is done in the post_create step.
 
         Args:
-            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
-            time (str | slice | None): The reference time or time slice. Not used for ArcticDEM.
+            roi (Geometry | GeoBox | gpd.GeoDataFrame): The reference geometry, geobox or reference geodataframe
+            toi (TOI): The time of interest to download.
+                Not used in this implementation since ArcticDEM is not temporal.
 
         Returns:
-            list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
+            list[PatchIndex]: List of adjacent patches, wrapped in own datastructure for easier processing.
 
         Raises:
             ValueError: If the roi is not a GeoBox or a GeoDataFrame.
@@ -212,12 +221,14 @@ class ArcticDEMABC(STACAccessor):
             )
         elif isinstance(roi, GeoBox):
             adjacent_tiles = extent_info.loc[extent_info.intersects(roi.boundingbox.polygon.geom)].copy()
+        elif isinstance(roi, Geometry):
+            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.geom)].copy()
         else:
             raise ValueError("roi must be a GeoBox or a GeoDataFrame")
         if adjacent_tiles.empty:
             return []
         return [
-            LazyStacTileWrapper(tile.dem_id, _get_stac_url(tile.dem_id, resolution))
+            LazyStacPatchIndex(tile.dem_id, _get_stac_url(tile.dem_id, resolution))
             for tile in adjacent_tiles.itertuples()
         ]
 

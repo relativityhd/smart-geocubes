@@ -1,13 +1,17 @@
 """STAC Accessor for Smart Geocubes."""
 
 import logging
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import xarray as xr
-import zarr
 from odc.geo.geobox import GeoBox
+from odc.geo.geom import Geometry
 
-from smart_geocubes.accessors.base import RemoteAccessor, TileWrapper
+from smart_geocubes.core import TOI, PatchIndex, RemoteAccessor, extract_toi_range
+
+if TYPE_CHECKING:
+    from pystac import Item
 
 logger = logging.getLogger(__name__)
 
@@ -62,54 +66,82 @@ class STACAccessor(RemoteAccessor):
     stac_api_url: str
     collection: str
 
-    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame, time: str | slice | None) -> list[TileWrapper]:
-        """Get adjacent tiles from a STAC API.
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI | None) -> list[PatchIndex["Item"]]:
+        """Get the adjacent patches for the given geobox.
+
+        Must be implemented by the Accessor.
 
         Args:
-            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
-            time (str | slice | None): The reference time or time range.
+            roi (Geometry | GeoBox | gpd.GeoDataFrame): The reference geometry, geobox or reference geodataframe
+            toi (TOI): The time of interest to download.
 
         Returns:
-            list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
+            list[PatchIndex[Item]]: The adjacent patch(-id)s for the given geobox.
+
+        Raises:
+            ValueError: If the ROI type is invalid.
 
         """
         import pystac_client
 
-        if isinstance(time, slice):
-            time = [time.start, time.stop]
+        if self.is_temporal:
+            toi = extract_toi_range(self.temporal_extent, toi)
 
         catalog = pystac_client.Client.open(self.stac_api_url)
-        geom = roi if isinstance(roi, gpd.GeoDataFrame) else roi.to_crs("EPSG:4326").extent.geom
-        search = catalog.search(collections=[self.collection], intersects=geom, datetime=time)
-        items = list(search.items())
-        return [TileWrapper(item.id, item) for item in items]
+        if isinstance(roi, gpd.GeoDataFrame):
+            geom = roi
+        elif isinstance(roi, GeoBox):
+            geom = roi.to_crs("EPSG:4326").extent.geom
+        elif isinstance(roi, Geometry):
+            geom = roi.to_crs("EPSG:4326").geom
+        else:
+            raise ValueError("Invalid ROI type.")
 
-    def download_tile(self, tile: TileWrapper) -> xr.Dataset:
-        """Download a tile from a STAC API and write it to a zarr datacube.
+        search = catalog.search(collections=[self.collection], intersects=geom, datetime=toi)
+        items = list(search.items())
+
+        patch_idxs = []
+        for item in items:
+            geom = Geometry(item.geometry, crs="EPSG:4326")
+            if self.is_temporal:
+                if item.datetime is not None:
+                    idx = PatchIndex(item.id, geom, item.datetime, item)
+                else:
+                    idx = PatchIndex(
+                        item.id, geom, (item.common_metadata.start_datetime, item.common_metadata.end_datetime), item
+                    )
+            else:
+                idx = PatchIndex(item.id, geom, None, item)
+            patch_idxs.append(idx)
+        return patch_idxs
+
+    def download_patch(self, idx: PatchIndex["Item"]) -> xr.Dataset:
+        """Download the data for the given patch.
+
+        Must be implemented by the Accessor.
 
         Args:
-            tile (TileWrapper): The tile to download and write.
+            idx (PatchIndex[Item]): The reference patch to download the data for.
 
         Returns:
-            xr.Dataset: The downloaded tile data.
+            xr.Dataset: The downloaded patch data.
 
         """
         from odc.stac import stac_load
 
-        tiledata = stac_load([tile.item], bands=self.channels, chunks=None, progress=None)
+        patch = stac_load([idx.item], bands=self.channels, chunks=None, progress=None)
 
         # Do a mosaic if multiple items are returned for non-temporal data
-        if "time" in tiledata.dims and self.temporal_extent is None:
-            tiledata = tiledata.max("time")
+        if "time" in patch.dims and self.temporal_extent is None:
+            patch = patch.max("time")
 
-        return tiledata
+        return patch
 
     def current_state(self) -> gpd.GeoDataFrame | None:
         """Get info about currently stored tiles.
 
         Returns:
             gpd.GeoDataFrame: Tile info from pystac. None if datacube is empty.
-
 
         """
         import geopandas as gpd
@@ -118,15 +150,13 @@ class STACAccessor(RemoteAccessor):
         if not self.created:
             return None
 
-        session = self.repo.readonly_session("main")
-        zcube = zarr.open(session.store, mode="r")
-        loaded_tiles = zcube.attrs.get("loaded_tiles", [])
+        loaded_patches = self.loaded_patches()
 
-        if len(loaded_tiles) == 0:
+        if len(loaded_patches) == 0:
             return None
 
         catalog = pystac_client.Client.open(self.stac_api_url)
-        search = catalog.search(collections=[self.collection], ids=loaded_tiles)
+        search = catalog.search(collections=[self.collection], ids=loaded_patches)
         stac_json = search.item_collection_as_dict()
 
         gdf = gpd.GeoDataFrame.from_features(stac_json, "epsg:4326")
