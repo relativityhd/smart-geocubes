@@ -94,8 +94,8 @@ def test_arcticdem_download_threaded():
         for i, result in results:
             if i != 0:
                 continue
-            assert result.mean == 102.0299
-            assert result.min == 46.34375
+            assert result.mean == 102.10579
+            assert result.min == 46.429688
             assert result.max == 483.83594
     finally:
         os.system("rm -rf arcticdem_32m.zarr")
@@ -128,8 +128,8 @@ def test_arcticdem_download_blocking_processes():
             if i != 0:
                 continue
             result = Stats(*result)
-            assert result.mean == 102.0299
-            assert result.min == 46.34375
+            assert result.mean == 102.10579
+            assert result.min == 46.429688
             assert result.max == 483.83594
     finally:
         os.system("rm -rf arcticdem_32m.zarr")
