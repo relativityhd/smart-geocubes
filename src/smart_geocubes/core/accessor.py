@@ -7,14 +7,13 @@ from typing import TYPE_CHECKING, ClassVar, Literal, TypedDict, Unpack
 
 import geopandas as gpd
 import icechunk
-import odc.geo
 import odc.geo.xr
 import pandas as pd
 import xarray as xr
 import zarr
 from odc.geo.geobox import GeoBox
 from odc.geo.geom import Geometry
-from stopuhr import StopUhr
+from stopuhr import Chronometer
 from zarr.codecs import BloscCodec
 from zarr.core.sync import sync
 
@@ -51,9 +50,7 @@ class RemoteAccessor(ABC):
         storage (icechunk.Storage): The icechunk storage.
         repo (icechunk.Repository): The icechunk repository.
         title (str): The title of the datacube.
-        stopuhr (StopUhr): The benchmarking timer from the stopuhr library.
-        zgeobox (GeoBox): The geobox of the underlaying zarr array. Should be equal to the extent geobox.
-            However, this property is used to find the target index of the downloaded data, so better save than sorry.
+        stopuhr (Chronometer): The benchmarking timer from the stopuhr library.
         created (bool): True if the datacube already exists in the storage.
 
     """
@@ -108,7 +105,7 @@ class RemoteAccessor(ABC):
         logger.debug(f"Using repository {self.repo=}")
 
         # The benchmarking timer for this accessor
-        self.stopuhr = StopUhr(logger.debug)
+        self.stopuhr = Chronometer(logger.debug)
 
         if backend == "threaded":
             if not _check_python_version(3, 13):
@@ -369,9 +366,9 @@ class RemoteAccessor(ABC):
                 self.assert_created()
 
             # Download the adjacent tiles (if necessary)
-            reference_geobox = aoi.to_crs(self.extent.crs)
+            aligned_aoi = aoi.to_crs(self.extent.crs)
             with self.stopuhr(f"{_geometry_repr(aoi)}: Procedural download in blocking mode"):
-                self.procedural_download(reference_geobox, toi)
+                self.procedural_download(aligned_aoi, toi)
 
             # Load the datacube and set the spatial_ref since it is set as a coordinate within the zarr format
             session = self.repo.readonly_session("main")
@@ -388,7 +385,7 @@ class RemoteAccessor(ABC):
                 xrcube = xrcube.sel(time=toi)
 
             # Get an AOI slice of the datacube
-            xrcube_aoi = xrcube.odc.crop(reference_geobox.extent, apply_mask=False)
+            xrcube_aoi = xrcube.odc.crop(aligned_aoi, apply_mask=False)
 
             # The following code would load the lazy zarr data from disk into memory
             if persist:

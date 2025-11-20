@@ -1,3 +1,5 @@
+"""Utility functions for smart geocubes."""
+
 import logging
 import sys
 
@@ -46,13 +48,14 @@ def _geometry_repr(geometry: Geometry) -> str:
     is_degrees = geometry.crs.units[0].startswith("degree")
     is_meter = geometry.crs.units[0].startswith("metre") or geometry.crs.units[0].startswith("meter")
 
-    center = geometry.centroid
+    x, y = geometry.centroid.xy
+    x, y = x[0], y[0]
     if is_meter:
-        center_str = f"({center.x:.1f}m, {center.y:.1f}m)"
+        center_str = f"({x:.1f}m, {y:.1f}m)"
     elif is_degrees:
-        center_str = f"({center.x:.5f}°, {center.y:.5f}°)"
+        center_str = f"({x:.5f}°, {y:.5f}°)"
     else:
-        center_str = f"({center.x}, {center.y})"
+        center_str = f"({x}, {y})"
     return f"Geometry({center_str} in {crs})"
 
 

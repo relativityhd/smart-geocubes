@@ -1,6 +1,7 @@
 """Write specific backends."""
 
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, wait
 from queue import Queue
 from threading import Thread
@@ -18,15 +19,17 @@ logger = logging.getLogger(__name__)
 class ThreadedBackend(DownloadBackend):
     """Threaded backend for downloading patches."""
 
-    def __init__(self, repo: icechunk.Repository, concurrent_downloads: int = 2):
+    def __init__(self, repo: icechunk.Repository, f: Callable[[PatchIndex], xr.Dataset], concurrent_downloads: int = 2):
         """Initialize the ThreadedBackend.
 
         Args:
             repo (icechunk.Repository): The icechunk repository.
+            f (callable[[PatchIndex], xr.Dataset]): A function that takes a PatchIndex and returns an xr.Dataset.
+                This should be implemented by the specific source backend.
             concurrent_downloads (int, optional): The number of concurrent downloads. Defaults to 2.
 
         """
-        super().__init__(repo)
+        super().__init__(repo, f)
 
         self.download_pool = ThreadPoolExecutor(max_workers=concurrent_downloads)
 
@@ -37,6 +40,7 @@ class ThreadedBackend(DownloadBackend):
         self.writer = Thread(target=self._writer, daemon=True, name="WriterThread")
         self.write_queue: Queue[xr.Dataset] = Queue(maxsize=2)
         self.writing_pool = ThreadPoolExecutor(max_workers=4)
+        self.writer.start()
 
     def close(self) -> bool:
         """Close the backend.
@@ -108,7 +112,7 @@ class ThreadedBackend(DownloadBackend):
             logger.debug(f"Patch {patch_id} already written, skipping.")
             return
 
-        target = self._get_target_slice(patch)
+        target = self._get_target_slice(patch, session)
 
         futures = {
             self.writing_pool.submit(self._write_patch_variable, zcube, patch[var].data, var, target): var
@@ -123,9 +127,6 @@ class ThreadedBackend(DownloadBackend):
         zcube.attrs["loaded_patches"] = loaded_patches
         session.commit(f"Write patch {patch_id}")
         logger.info(f"Patch {patch_id} written successfully.")
-
-        # Update session after change
-        self.session = self.repo.readonly_session("main")
 
     def _download_in_pool(self, idx: PatchIndex):
         # Wrapping this to be able to pass it into the queue, which is blocking

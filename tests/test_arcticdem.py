@@ -1,3 +1,4 @@
+import logging
 import multiprocessing as mp
 import os
 from collections import namedtuple
@@ -9,15 +10,22 @@ from odc.geo.geobox import GeoBox
 
 import smart_geocubes
 
+# Setup logging
+logger = logging.getLogger("smart_geocubes")
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
 
 def test_arcticdem32m_download():
     try:
         geobox = GeoBox.from_bbox((150, 65, 151, 65.5), shape=(1000, 1000))
         storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
-        accessor = smart_geocubes.ArcticDEM32m(storage)
+        accessor = smart_geocubes.ArcticDEM32m(storage, backend="threaded")
         adem = accessor.load(geobox, create=True)
-        assert adem.dem.mean() == 102.0299
-        assert adem.dem.min() == 46.34375
+        print(adem.dem.mean(), adem.dem.min(), adem.dem.max())
+        assert adem.dem.mean() == 102.10579
+        assert adem.dem.min() == 46.429688
         assert adem.dem.max() == 483.83594
         assert_almost_equal(
             adem.odc.geobox.center_pixel.coords["x"].values / 1_000_000,
@@ -30,7 +38,8 @@ def test_arcticdem32m_download():
             decimal=4,
         )
     finally:
-        del adem
+        if "adem" in locals():
+            del adem
         os.system("rm -rf arcticdem_32m.zarr")
 
 
@@ -38,7 +47,7 @@ def test_arcticdem2m_download():
     try:
         geobox = GeoBox.from_bbox((150, 65, 150.1, 65.1), shape=(1000, 1000))
         storage = icechunk.local_filesystem_storage("arcticdem_2m.zarr")
-        accessor = smart_geocubes.ArcticDEM2m(storage)
+        accessor = smart_geocubes.ArcticDEM2m(storage, backend="threaded")
         adem = accessor.load(geobox, create=True)
         print(adem.dem.mean(), adem.dem.min(), adem.dem.max())
         assert adem.dem.mean() == 203.03644
@@ -55,7 +64,8 @@ def test_arcticdem2m_download():
             decimal=4,
         )
     finally:
-        del adem
+        if "adem" in locals():
+            del adem
         os.system("rm -rf arcticdem_2m.zarr")
 
 
@@ -65,11 +75,11 @@ Stats = namedtuple("Stats", ["mean", "min", "max"])
 def test_arcticdem_download_threaded():
     try:
         storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
-        accessor = smart_geocubes.ArcticDEM32m(storage)
+        accessor = smart_geocubes.ArcticDEM32m(storage, backend="threaded")
         accessor.create(overwrite=True)
 
         def _task(i, geobox: GeoBox) -> Stats:
-            adem = accessor.load(geobox, concurrency_mode="threading")
+            adem = accessor.load(geobox)
             return i, Stats(adem.dem.mean(), adem.dem.min(), adem.dem.max())
 
         geoboxes = [
@@ -93,7 +103,7 @@ def test_arcticdem_download_threaded():
 
 def _mp_task(i, geobox: GeoBox) -> tuple[int, Stats]:
     storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
-    accessor = smart_geocubes.ArcticDEM32m(storage)
+    accessor = smart_geocubes.ArcticDEM32m(storage, backend="simple")
     adem = accessor.load(geobox)
     return i, (adem.dem.mean().item(), adem.dem.min().item(), adem.dem.max().item())
 

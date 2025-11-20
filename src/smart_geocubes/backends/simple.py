@@ -1,7 +1,6 @@
 """Write specific backends."""
 
 import logging
-from concurrent.futures import wait
 
 import xarray as xr
 import zarr
@@ -28,22 +27,13 @@ class SimpleBackend(DownloadBackend):
 
         target = self._get_target_slice(patch)
 
-        futures = {
-            self.writing_pool.submit(self._write_patch_variable, zcube, patch[var].data, var, target): var
-            for var in patch.data_vars
-        }
-        _, failed = wait(futures)
-        if len(failed) > 0:
-            logger.error(f"Writing patch {patch_id} failed for variables {[futures[f] for f in failed]}.")
-            raise RuntimeError(f"Writing patch {patch_id} failed.")
+        for var in patch.data_vars:
+            self._write_patch_variable(zcube, patch[var].data, var, target)
 
         loaded_patches.append(patch_id)
         zcube.attrs["loaded_patches"] = loaded_patches
         session.commit(f"Write patch {patch_id}")
         logger.info(f"Patch {patch_id} written successfully.")
-
-        # Update session after change
-        self.session = self.repo.readonly_session("main")
 
     def submit(self, idx: PatchIndex | list[PatchIndex]):
         """Submit a patch download request to the backend.

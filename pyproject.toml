@@ -8,7 +8,6 @@ requires-python = ">=3.11"
 dependencies = [
     "geopandas>=1.0.0",
     "icechunk>=1.1,<2",
-    "numcodecs>=0.15.0,<0.17",
     "numpy>=2.0.0,<3",
     "odc-geo>=0.4.5,<0.5",
     "stopuhr>=0.0.10",

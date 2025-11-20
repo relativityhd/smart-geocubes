@@ -3699,7 +3699,6 @@ source = { editable = "." }
 dependencies = [
     { name = "geopandas" },
     { name = "icechunk" },
-    { name = "numcodecs" },
     { name = "numpy" },
     { name = "odc-geo" },
     { name = "stopuhr" },
@@ -3770,7 +3769,6 @@ requires-dist = [
     { name = "icechunk", specifier = ">=1.1,<2" },
     { name = "mapclassify", marker = "extra == 'viz'", specifier = ">=2.8.1" },
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.10.0" },
-    { name = "numcodecs", specifier = ">=0.15.0,<0.17" },
     { name = "numpy", specifier = ">=2.0.0,<3" },
     { name = "odc-geo", specifier = ">=0.4.5,<0.5" },
     { name = "odc-stac", marker = "extra == 'stac'", specifier = ">=0.3.11" },

@@ -29,9 +29,6 @@ class DownloadBackend(abc.ABC):
 
         """
         self.repo = repo
-        # Default session
-        self.session = repo.readonly_session("main")
-
         self.download_from_source = f
 
     @property
@@ -42,17 +39,19 @@ class DownloadBackend(abc.ABC):
             bool: True if the datacube already exists in the storage.
 
         """
-        return not sync(self.session.store.is_empty(""))
+        return not sync(self.repo.readonly_session("main").store.is_empty(""))
 
-    def assert_created(self):
+    def assert_created(self, session: icechunk.Session | None = None):
         """Assert that the datacube exists in the storage.
 
         Raises:
             FileNotFoundError: If the datacube does not exist.
 
         """
-        if not self.created:
-            msg = f"Datacube {self.title} does not exist."
+        if session is None:
+            session = self.repo.readonly_session("main")
+        if sync(session.store.is_empty("")):
+            msg = "Datacube does not exist."
             " Please use the `create` method or pass `create=True` to `load`."
             logger.error(msg)
             raise FileNotFoundError(msg)
@@ -64,9 +63,9 @@ class DownloadBackend(abc.ABC):
             zarr.Group: The zarr datacube.
 
         """
-        self.assert_created()
         if session is None:
-            session = self.session
+            session = self.repo.readonly_session("main")
+        self.assert_created(session)
         zcube = zarr.open(store=session.store, mode="r")
         return zcube
 
@@ -77,9 +76,9 @@ class DownloadBackend(abc.ABC):
             xr.Dataset: The xarray datacube.
 
         """
-        self.assert_created()
         if session is None:
-            session = self.session
+            session = self.repo.readonly_session("main")
+        self.assert_created(session)
         xcube = xr.open_zarr(session.store, mask_and_scale=False, consolidated=False).set_coords("spatial_ref")
         return xcube
 
@@ -94,11 +93,13 @@ class DownloadBackend(abc.ABC):
         loaded_tiles = zcube.attrs.get("loaded_tiles", [])
         return loaded_tiles
 
-    def _get_target_slice(self, patch: xr.Dataset) -> tuple[slice | list[int], slice, slice] | tuple[slice, slice]:
-        xcube = self.open_xarray()
+    def _get_target_slice(
+        self, patch: xr.Dataset, session: icechunk.Session | None = None
+    ) -> tuple[slice | list[int], slice, slice] | tuple[slice, slice]:
+        xcube = self.open_xarray(session)
         _log_xcube_stats(xcube, "Target xcube")
 
-        spatial_target = self.zgeobox.overlap_roi(patch.odc.geobox)
+        spatial_target = xcube.odc.geobox.overlap_roi(patch.odc.geobox)
 
         if "time" not in xcube.dims:
             logger.debug(f"Geocube is not temporal - writing to {spatial_target=}.")
