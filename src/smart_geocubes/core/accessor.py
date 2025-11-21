@@ -241,7 +241,7 @@ class RemoteAccessor(ABC):
                     )
                     for name in self.channels
                 },
-                attrs={"title": self.title, "loaded_tiles": []},
+                attrs={"title": self.title, "loaded_patches": []},
             )
 
             # Expand to temporal dimension if defined
@@ -393,7 +393,7 @@ class RemoteAccessor(ABC):
                     xrcube_aoi = xrcube_aoi.load()
         return xrcube_aoi
 
-    def procedural_download(self, aoi: Geometry, toi: TOI):
+    def procedural_download(self, aoi: Geometry | GeoBox, toi: TOI):
         """Download tiles procedurally.
 
         Warning:
@@ -403,7 +403,8 @@ class RemoteAccessor(ABC):
             In such cases, the download will be retried until it succeeds or the number of maximum-tries is reached.
 
         Args:
-            aoi (Geometry): The geometry of the aoi to download.
+            aoi (Geometry | GeoBox): The geometry of the aoi to download. If a Geobox is provided,
+                it will use the extent of the geobox.
             toi (TOI): The time of interest to download.
 
         Raises:
@@ -411,6 +412,9 @@ class RemoteAccessor(ABC):
             ValueError: If not all downloads were successful.
 
         """
+        if isinstance(aoi, GeoBox):
+            aoi = aoi.extent
+
         adjacent_patches = self.adjacent_patches(aoi, toi)
         # interest-string
         soi = f"{_geometry_repr(aoi)}" + (f" @ {_repr_toi(toi)}" if toi is not None else "")

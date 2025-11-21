@@ -73,6 +73,7 @@ dev = [
     "geemap>=0.36.0",
     "ipykernel>=6.29.5",
     "ipywidgets>=8.1.5",
+    "jupyterlab>=4.5.0",
     "rich>=13.9.4",
     "ruff>=0.9.5",
 ]

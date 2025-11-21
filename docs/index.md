@@ -76,12 +76,17 @@ arcticdem_at_roi = accessor.load(roi, create=True)
 
 ## Out of the box included datasets
 
-| Dataset              | Quickuse                      | Source                                   | Link                                                                         |
-| -------------------- | ----------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| ArcticDEM Mosaic 2m  | `smart_geocubes.ArcticDEM2m`  | [STAC](https://stac.pgc.umn.edu/api/v1/) | [PGC](https://www.pgc.umn.edu/data/arcticdem/)                               |
-| ArcticDEM Mosaic 10m | `smart_geocubes.ArcticDEM10m` | [STAC](https://stac.pgc.umn.edu/api/v1/) | [PGC](https://www.pgc.umn.edu/data/arcticdem/)                               |
-| ArcticDEM Mosaic 32m | `smart_geocubes.ArcticDEM32m` | [STAC](https://stac.pgc.umn.edu/api/v1/) | [PGC](https://www.pgc.umn.edu/data/arcticdem/)                               |
-| Tasseled Cap Tren    | `smart_geocubes.TCTrend`      | Google Earth Engine                      | [AWI](https://apgc.awi.de/dataset/pan-arctic-vis-landscape-change-2003-2022) |
+| Dataset                          | Quickuse                              | Source                                   | Link / Notes                                                                                                             |
+| -------------------------------- | ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ArcticDEM Mosaic 2m              | `smart_geocubes.ArcticDEM2m`          | [STAC](https://stac.pgc.umn.edu/api/v1/) | [PGC](https://www.pgc.umn.edu/data/arcticdem/)                                                                           |
+| ArcticDEM Mosaic 10m             | `smart_geocubes.ArcticDEM10m`         | [STAC](https://stac.pgc.umn.edu/api/v1/) | [PGC](https://www.pgc.umn.edu/data/arcticdem/)                                                                           |
+| ArcticDEM Mosaic 32m             | `smart_geocubes.ArcticDEM32m`         | [STAC](https://stac.pgc.umn.edu/api/v1/) | [PGC](https://www.pgc.umn.edu/data/arcticdem/)                                                                           |
+| Tasseled Cap Trends 2019         | `smart_geocubes.TCTrend2019`          | Google Earth Engine                      | [AWI](https://apgc.awi.de/dataset/pan-arctic-vis-landscape-change-2003-2022)                                             |
+| Tasseled Cap Trends 2020         | `smart_geocubes.TCTrend2020`          | Google Earth Engine                      | [AWI](https://apgc.awi.de/dataset/pan-arctic-vis-landscape-change-2003-2022)                                             |
+| Tasseled Cap Trends 2022         | `smart_geocubes.TCTrend2022`          | Google Earth Engine                      | [AWI](https://apgc.awi.de/dataset/pan-arctic-vis-landscape-change-2003-2022)                                             |
+| AlphaEarth Satellite Embeddings* | `smart_geocubes.AlphaEarthEmbeddings` | Google Earth Engine                      | [EE](https://developers.google.com/earth-engine/datasets/catalog/GOOGLE_SATELLITE_EMBEDDING_V1_ANNUAL?hl=de#description) |
+
+*: Note that the original embeddings are stored in their respective UTM-Zones, but Smart-Geocubes reprojects them into EPSG:4326 to create a single Datacube. This may change in the future, if UTM-Zones are properly supported.
 
 ## Implemented Remote Accessors
 

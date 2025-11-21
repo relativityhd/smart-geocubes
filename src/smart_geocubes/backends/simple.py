@@ -28,7 +28,7 @@ class SimpleBackend(DownloadBackend):
         target = self._get_target_slice(patch)
 
         for var in patch.data_vars:
-            self._write_patch_variable(zcube, patch[var].data, var, target)
+            self._write_patch_variable(zcube, patch[var].data, var, target, patch_id)
 
         loaded_patches.append(patch_id)
         zcube.attrs["loaded_patches"] = loaded_patches
@@ -45,5 +45,9 @@ class SimpleBackend(DownloadBackend):
         if isinstance(idx, PatchIndex):
             idx = [idx]
         for i in idx:
+            self._log_event("start_download", i.id)
             patch = self._download_from_source_with_retries(i)
+            self._log_event("end_download", i.id)
+            self._log_event("start_write", i.id)
             self._write_patch(patch)
+            self._log_event("end_write", i.id)

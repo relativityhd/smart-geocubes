@@ -19,19 +19,21 @@ logger = logging.getLogger(__name__)
 class ThreadedBackend(DownloadBackend):
     """Threaded backend for downloading patches."""
 
-    def __init__(self, repo: icechunk.Repository, f: Callable[[PatchIndex], xr.Dataset], concurrent_downloads: int = 2):
+    def __init__(self, repo: icechunk.Repository, f: Callable[[PatchIndex], xr.Dataset], concurrent_downloads: int = 4):
         """Initialize the ThreadedBackend.
 
         Args:
             repo (icechunk.Repository): The icechunk repository.
             f (callable[[PatchIndex], xr.Dataset]): A function that takes a PatchIndex and returns an xr.Dataset.
                 This should be implemented by the specific source backend.
-            concurrent_downloads (int, optional): The number of concurrent downloads. Defaults to 2.
+            concurrent_downloads (int, optional): The number of concurrent downloads. Defaults to 4.
 
         """
         super().__init__(repo, f)
 
-        self.download_pool = ThreadPoolExecutor(max_workers=concurrent_downloads)
+        self.download_pool = ThreadPoolExecutor(
+            max_workers=concurrent_downloads, thread_name_prefix="DownloadPoolThread"
+        )
 
         # The writer allows for asynchronous download and writing
         # The writing_pool allows for concurrent writes within the writer thread
@@ -39,7 +41,7 @@ class ThreadedBackend(DownloadBackend):
         # from piling up in memory
         self.writer = Thread(target=self._writer, daemon=True, name="WriterThread")
         self.write_queue: Queue[xr.Dataset] = Queue(maxsize=2)
-        self.writing_pool = ThreadPoolExecutor(max_workers=4)
+        self.writing_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="WritingPoolThread")
         self.writer.start()
 
     def close(self) -> bool:
@@ -79,10 +81,13 @@ class ThreadedBackend(DownloadBackend):
             logger.debug(f"Writing patch {patch_id}...")
             for t in range(100):
                 try:
+                    self._log_event(f"start_write_try{t}", patch_id)
                     self._write_patch(patch)
                     break
                 except icechunk.ConflictError as conflict_error:
                     logger.debug(f"{patch_id=}: {conflict_error=} at write retry {t}/100")
+                finally:
+                    self._log_event(f"end_write_try{t}", patch_id)
             else:
                 logger.error(
                     f"{patch_id=}: 100 tries to write the tile failed. "
@@ -115,7 +120,7 @@ class ThreadedBackend(DownloadBackend):
         target = self._get_target_slice(patch, session)
 
         futures = {
-            self.writing_pool.submit(self._write_patch_variable, zcube, patch[var].data, var, target): var
+            self.writing_pool.submit(self._write_patch_variable, zcube, patch[var].data, var, target, patch_id): var
             for var in patch.data_vars
         }
         _, failed = wait(futures)
@@ -132,7 +137,9 @@ class ThreadedBackend(DownloadBackend):
         # Wrapping this to be able to pass it into the queue, which is blocking
         # This prevents too many successful downloads from piling up in memory
         # because the queue has a maxsize of 2
+        self._log_event("start_download", idx.id)
         patch = self._download_from_source_with_retries(idx)
+        self._log_event("end_download", idx.id)
         self.write_queue.put(patch)
 
     def submit(self, idx: PatchIndex | list[PatchIndex]):
