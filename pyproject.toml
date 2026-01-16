@@ -13,7 +13,7 @@ dependencies = [
     "odc-geo>=0.4.5,<0.5",
     "stopuhr>=0.0.3",
     "xarray>=2025.1.1",
-    "zarr>=3,<4",
+    "zarr>3.0.2,<3.1.0",
 ]
 license = "MIT"
 license-files = ["LICENSE"]
