@@ -126,6 +126,12 @@ class GEEAccessor(RemoteAccessor):
         # For some reason xee does not always set the crs
         tiledata = tiledata.odc.assign_crs(self.extent.crs)
 
+        if tile.item.affine[2] < -180:
+            # BBox of tile wraps WEST around antimeridian and has western hemisphere coordinates
+            # tiledata will however have eastern hemispheric coordinates (> +179.xx)
+            # move the tiledata x-coordinates also into the western hemisphere
+            tiledata["x"] = tiledata.x - 360
+
         # Recrop the data to the tile, since gee does not always return the exact extent
         tiledata = tiledata.odc.crop(tile.item.extent)
 
