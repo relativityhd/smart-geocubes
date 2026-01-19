@@ -101,7 +101,10 @@ def _download_arcticdem_extent(save_dir: Path):
         # Move the extracted files to the parent directory
         extracted_dir = save_dir / zip_name
         for file in extracted_dir.iterdir():
-            file.rename(save_dir / file.name)
+            if not (save_dir / file.name).exists():
+                file.rename(save_dir / file.name)
+            else:
+                file.unlink()
 
         # Remove the empty directory
         extracted_dir.rmdir()
