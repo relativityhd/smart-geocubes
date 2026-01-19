@@ -400,13 +400,14 @@ class RemoteAccessor(ABC):
             zcube = zarr.open(store=session.store, mode="r")
             loaded_tiles = zcube.attrs.get("loaded_tiles", [])
             new_tiles = [tile for tile in adjacent_tiles if tile.id not in loaded_tiles]
-            logger.debug(f"{len(adjacent_tiles)=} & {len(loaded_tiles)=} -> {len(new_tiles)=} to download")
+            logger.debug(f"{len(adjacent_tiles)=} / {len(loaded_tiles)=}")
+            logger.info(f"{len(new_tiles)} tiles to download")
             if not new_tiles:
                 return
 
             for tile in new_tiles:
                 with self.stopuhr(f"{tile.id=}: Downloading one new tile in blocking mode"):
-                    logger.debug(f"{tile.id=}: Start downloading")
+                    logger.info(f"{tile.id=}: Start downloading")
                     tiledata = self.download_tile(tile)
 
                 # Try to write the data to file until a limit is reached

@@ -144,6 +144,9 @@ class GEEAccessor(RemoteAccessor):
         # Interpolate missing values (there are very few, so we actually can interpolate them)
         tiledata.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=True)
         for band in tiledata.data_vars:
+            na_vals_ct = int(tiledata[band].isnull().sum())
+            if na_vals_ct > 1e6:
+                logger.info(f"band '{band}/{tile.id}' contains {na_vals_ct} NA values, interpolation may take some time")
             tiledata[band] = tiledata[band].rio.write_nodata(np.nan).rio.interpolate_na()
 
         # Convert to uint8
