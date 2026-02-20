@@ -13,6 +13,7 @@ from odc.geo.geobox import GeoBox, GeoboxTiles
 from smart_geocubes.accessors.base import RemoteAccessor, TileWrapper
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 EE_WARN_MSG = "Unable to retrieve 'system:time_start' values from an ImageCollection due to: No 'system:time_start' values found in the 'ImageCollection'."  # noqa: E501
 
@@ -94,6 +95,8 @@ class GEEAccessor(RemoteAccessor):
         import ee
         import rioxarray  # noqa: F401
         import xee  # noqa: F401
+
+        logger.debug(f"GEE Accessor for collection '{self.collection}' downloading {tile.item.geographic_extent.boundingbox}")
 
         # Note: This is a little bit weird: First we create an own grid which overlaps to the chunks
         # of the zarr array. Then we create a mosaic of the data and clip it to a single chunk.
