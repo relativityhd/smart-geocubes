@@ -2,15 +2,16 @@
 
 import logging
 import warnings
+from dataclasses import dataclass
 from functools import cached_property
 
 import geopandas as gpd
-import numpy as np
+import pandas as pd
 import xarray as xr
-import zarr
 from odc.geo.geobox import GeoBox, GeoboxTiles
+from odc.geo.geom import Geometry
 
-from smart_geocubes.accessors.base import RemoteAccessor, TileWrapper
+from smart_geocubes.core import TOI, PatchIndex, RemoteAccessor, normalize_toi
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -18,16 +19,16 @@ logger.setLevel(logging.DEBUG)
 EE_WARN_MSG = "Unable to retrieve 'system:time_start' values from an ImageCollection due to: No 'system:time_start' values found in the 'ImageCollection'."  # noqa: E501
 
 
-def _tileidx_to_id(tileidx: tuple[int, int]) -> str:
-    return "-".join(str(i) for i in tileidx)
+@dataclass
+class Item:
+    """Simple wrapper over what accessor returns as item."""
+
+    geobox: GeoBox
+    time: pd.Timestamp | None = None
 
 
-def _id_to_tileidx(tileid: str) -> tuple[int, int]:
-    return tuple(int(i) for i in tileid.split("-"))
-
-
-class GEEAccessor(RemoteAccessor):
-    """Accessor for Google Earth Engine data.
+class GEEMosaicAccessor(RemoteAccessor):
+    """Accessor for Google Earth Engine data using mosaics.
 
     Attributes:
         extent (GeoBox): The extent of the datacube represented by a GeoBox.
@@ -57,16 +58,44 @@ class GEEAccessor(RemoteAccessor):
     def _extent_tiles(self) -> GeoboxTiles:
         return GeoboxTiles(self.extent, (self.chunk_size, self.chunk_size))
 
-    def adjacent_tiles(self, roi: GeoBox | gpd.GeoDataFrame) -> list[TileWrapper]:
-        """Get adjacent tiles from Google Earth Engine.
+    def _stringify_index(self, spatial_idx: tuple[int, int], time_idx: int | None = None) -> str:
+        s = "-".join(str(i) for i in spatial_idx)
+        if time_idx is not None:
+            s = f"{time_idx}-{s}"
+        return s
+
+    def _parse_index(self, idx: str) -> tuple[tuple[int, int], int | None]:
+        # Returns spatial_idx, temporal_idx
+        parts = idx.split("-")
+        if len(parts) == 2:
+            assert not self.is_temporal, "Non-temporal index provided for temporal datacube."
+            return (int(parts[0]), int(parts[1])), None
+        elif len(parts) == 3:
+            assert self.is_temporal, "Temporal index provided for non-temporal datacube."
+            return (int(parts[1]), int(parts[2])), int(parts[0])
+        else:
+            raise ValueError(f"Invalid index string: {idx}")
+
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[Item]:
+        """Get the adjacent patches for the given geobox.
+
+        Must be implemented by the Accessor.
 
         Args:
-            roi (GeoBox | gpd.GeoDataFrame): The reference geobox or reference geodataframe
+            roi (Geometry | GeoBox | gpd.GeoDataFrame): The reference geometry, geobox or reference geodataframe
+            toi (TOI): The time of interest to download.
 
         Returns:
-            list[TileWrapper]: List of adjacent tiles, wrapped in own datastructure for easier processing.
+            list[PatchIndex[Item]]: The adjacent patch(-id)s for the given geobox.
+
+        Raises:
+            ValueError: If the ROI type is invalid.
+            ValueError: If the datacube is not temporal, but a time of interest is provided.
 
         """
+        if toi is not None and not self.is_temporal:
+            raise ValueError("Datacube is not temporal, but time of interest is provided.")
+
         if isinstance(roi, gpd.GeoDataFrame):
             adjacent_geometries = (
                 gpd.sjoin(self._tile_geometries, roi.to_crs(self.extent.crs.wkt), how="inner", predicate="intersects")
@@ -74,22 +103,52 @@ class GEEAccessor(RemoteAccessor):
                 .drop_duplicates(subset="index", keep="first")
                 .set_index("index")
             )
-            return [TileWrapper(_tileidx_to_id(idx), self._extent_tiles[idx]) for idx in adjacent_geometries["idx"]]
-
+            spatial_idxs: list[tuple[int, int]] = list(adjacent_geometries["idx"])
         elif isinstance(roi, GeoBox):
+            spatial_idxs: list[tuple[int, int]] = list(self._extent_tiles.tiles(roi.extent))
+        elif isinstance(roi, Geometry):
+            spatial_idxs: list[tuple[int, int]] = list(self._extent_tiles.tiles(roi))
+        else:
+            raise ValueError("Invalid ROI type.")
+
+        if not self.is_temporal:
             return [
-                TileWrapper(_tileidx_to_id(idx), self._extent_tiles[idx])
-                for idx in self._extent_tiles.tiles(roi.extent)
+                PatchIndex(
+                    self._stringify_index(spatial_idx),
+                    self._extent_tiles[spatial_idx].geographic_extent,
+                    None,
+                    Item(self._extent_tiles[spatial_idx], None),
+                )
+                for spatial_idx in spatial_idxs
             ]
 
-    def download_tile(self, tile: TileWrapper) -> xr.Dataset:
-        """Download a tile from Google Earth Engine.
+        # Now datacube is temporal
+        toi = normalize_toi(self.temporal_extent, toi)
+        patch_idxs = []
+        for time in toi:
+            time_idx = self.temporal_extent.get_loc(time)
+            assert isinstance(time_idx, int), "Non-Unique temporal extents are not supported!"
+            for spatial_idx in spatial_idxs:
+                patch_idxs.append(
+                    PatchIndex(
+                        self._stringify_index(spatial_idx, time_idx),
+                        self._extent_tiles[spatial_idx].geographic_extent,
+                        time,
+                        Item(self._extent_tiles[spatial_idx], time),
+                    )
+                )
+        return patch_idxs
+
+    def download_patch(self, idx: PatchIndex[Item]) -> xr.Dataset:
+        """Download the data for the given patch.
+
+        Must be implemented by the Accessor.
 
         Args:
-            tile (TileWrapper): The tile to download.
+            idx (PatchIndex[Item]): The reference patch to download the data for.
 
         Returns:
-            xr.Dataset: The downloaded tile data.
+            xr.Dataset: The downloaded patch data.
 
         """
         import ee
@@ -104,11 +163,16 @@ class GEEAccessor(RemoteAccessor):
         # However, this would require more testing and probably results a lot of manual computation
         # of slices etc. like in the stac variant. So for now, we just use the mosaic.
         logging.getLogger("urllib3.connectionpool").disabled = True
-        geom = ee.Geometry.Rectangle(tile.item.geographic_extent.boundingbox)
-        ee_img = ee.ImageCollection(self.collection).mosaic().clip(geom)
+
+        ee_col = ee.ImageCollection(self.collection)
+        if self.is_temporal:
+            ee_col = ee_col.filterDate(idx.item.time)
+        geom = ee.Geometry.Rectangle(idx.item.geobox.geographic_extent.boundingbox)
+        ee_img = ee_col.mosaic().clip(geom)
+
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, message=EE_WARN_MSG)
-            tiledata = xr.open_dataset(
+            patch = xr.open_dataset(
                 ee_img,
                 engine="ee",
                 geometry=geom,
@@ -116,50 +180,39 @@ class GEEAccessor(RemoteAccessor):
                 scale=self.extent.resolution.x,
             )
 
-        # TODO: Allow for multi-temporal datacubes and lat/lon coordinates
-        tiledata = tiledata.max("time").rename({"lon": "x", "lat": "y"}).transpose("y", "x")
+        # Do a mosaic if time axis are returned for non-temporal data
+        if "time" in patch.dims and not self.is_temporal:
+            patch = patch.max("time")
+
+        patch = patch.rename({"lon": "x", "lat": "y"})
+        if "time" in patch.dims:
+            patch["time"] = [idx.item.time]
+            patch = patch.transpose("time", "y", "x")
+        else:
+            patch = patch.transpose("y", "x")
 
         # Download the data
-        tiledata.load()
+        logger.debug(f"{idx.id=}: Trigger GEE download)")
+        patch.load()
+        logger.debug(f"{idx.id=}: Finished GEE download")
         logging.getLogger("urllib3.connectionpool").disabled = False
 
         # Flip y-axis, because convention is x in positive direction and y in negative, but gee use positive for both
-        tiledata = tiledata.isel(y=slice(None, None, -1))
+        patch = patch.isel(y=slice(None, None, -1))
 
         # For some reason xee does not always set the crs
-        tiledata = tiledata.odc.assign_crs(self.extent.crs)
+        patch = patch.odc.assign_crs(self.extent.crs)
 
-        if tile.item.affine[2] < -180:
+        if idx.item.affine[2] < -180:
             # BBox of tile wraps WEST around antimeridian and has western hemisphere coordinates
-            # tiledata will however have eastern hemispheric coordinates (> +179.xx)
-            # move the tiledata x-coordinates also into the western hemisphere
-            tiledata["x"] = tiledata.x - 360
+            # patch will however have eastern hemispheric coordinates (> +179.xx)
+            # move the patch x-coordinates also into the western hemisphere
+            patch["x"] = patch.x - 360
 
         # Recrop the data to the tile, since gee does not always return the exact extent
-        tiledata = tiledata.odc.crop(tile.item.extent)
+        patch = patch.odc.crop(idx.item.geobox.extent)
 
-        # Save original min-max values for each band for clipping later
-        clip_values = {
-            band: (tiledata[band].min().values.item(), tiledata[band].max().values.item())
-            for band in tiledata.data_vars
-        }
-
-        # Interpolate missing values (there are very few, so we actually can interpolate them)
-        tiledata.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=True)
-        for band in tiledata.data_vars:
-            na_vals_ct = int(tiledata[band].isnull().sum())
-            if na_vals_ct > 1e6:
-                logger.info(f"band '{band}/{tile.id}' contains {na_vals_ct} NA values, interpolation may take some time")
-            tiledata[band] = tiledata[band].rio.write_nodata(np.nan).rio.interpolate_na()
-
-        # Convert to uint8
-        for band in tiledata.data_vars:
-            band_min, band_max = clip_values[band]
-            tiledata[band] = (
-                tiledata[band].clip(band_min, band_max, keep_attrs=True).astype("uint8").rio.write_nodata(None)
-            )
-
-        return tiledata
+        return patch
 
     def current_state(self) -> gpd.GeoDataFrame | None:
         """Get info about currently stored tiles.
@@ -173,14 +226,20 @@ class GEEAccessor(RemoteAccessor):
         if not self.created:
             return None
 
-        session = self.repo.readonly_session("main")
-        zcube = zarr.open(session.store, mode="r")
-        loaded_tiles = zcube.attrs.get("loaded_tiles", [])
+        loaded_patches = self.loaded_patches()
 
-        if len(loaded_tiles) == 0:
+        if len(loaded_patches) == 0:
             return None
 
-        tiles = GeoboxTiles(self.extent, (self.chunk_size, self.chunk_size))
-        loaded_tiles = [{"geometry": tiles[_id_to_tileidx(tid)].extent.geom, "id": tid} for tid in loaded_tiles]
-        gdf = gpd.GeoDataFrame(loaded_tiles, crs=self.extent.crs.to_wkt())
+        patch_infos = []
+        for pid in loaded_patches:
+            spatial_idx, temporal_idx = self._parse_index(pid)
+            geometry = self._extent_tiles[spatial_idx].extent.geom
+            if self.is_temporal:
+                time = self.temporal_extent[temporal_idx]
+                patch_infos.append({"geometry": geometry, "id": pid, "time": time})
+            else:
+                patch_infos.append({"geometry": geometry, "id": pid})
+
+        gdf = gpd.GeoDataFrame(patch_infos, crs=self.extent.crs.to_wkt())
         return gdf
