@@ -367,7 +367,7 @@ class RemoteAccessor(ABC):
 
             # Download the adjacent tiles (if necessary)
             aligned_aoi = aoi.to_crs(self.extent.crs)
-            with self.stopuhr(f"{_geometry_repr(aoi)}: Procedural download in blocking mode"):
+            with self.stopuhr(f"{_geometry_repr(aoi)}: Procedural download of missing tiles"):
                 self.procedural_download(aligned_aoi, toi)
 
             # Load the datacube and set the spatial_ref since it is set as a coordinate within the zarr format

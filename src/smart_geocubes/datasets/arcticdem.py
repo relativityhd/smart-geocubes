@@ -109,7 +109,10 @@ def _download_arcticdem_extent(save_dir: Path):
         # Move the extracted files to the parent directory
         extracted_dir = save_dir / zip_name
         for file in extracted_dir.iterdir():
-            file.rename(save_dir / file.name)
+            if not (save_dir / file.name).exists():
+                file.rename(save_dir / file.name)
+            else:
+                file.unlink()
 
         # Remove the empty directory
         extracted_dir.rmdir()
@@ -207,12 +210,13 @@ class ArcticDEMABC(STACAccessor):
         self.assert_created()
 
         resolution = f"{int(self.extent.resolution.x)}m"
-        extent_info = gpd.read_parquet(self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{resolution}.parquet")
+        # do intersection in Polar Sterographic to avoid Problems around antimeridian
+        extent_info = gpd.read_parquet(self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{resolution}.parquet").to_crs(3413)
         if isinstance(roi, gpd.GeoDataFrame):
             adjacent_tiles = (
                 gpd.sjoin(
                     extent_info,
-                    roi[["geometry"]].to_crs(self.extent.crs.wkt),
+                    roi[["geometry"]].to_crs(3413),
                     how="inner",
                     predicate="intersects",
                 )
@@ -220,9 +224,9 @@ class ArcticDEMABC(STACAccessor):
                 .drop_duplicates(subset="index", keep="first", ignore_index=True)
             )
         elif isinstance(roi, GeoBox):
-            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.boundingbox.polygon.geom)].copy()
+            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.to_crs(3413).boundingbox.polygon.geom)].copy()
         elif isinstance(roi, Geometry):
-            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.geom)].copy()
+            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.to_crs(3413).geom)].copy()
         else:
             raise ValueError("roi must be a GeoBox or a GeoDataFrame")
         if adjacent_tiles.empty:

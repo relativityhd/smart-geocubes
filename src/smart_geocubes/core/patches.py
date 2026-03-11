@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from odc.geo.geom import Geometry
 
@@ -10,7 +10,7 @@ PatchItem = TypeVar("PatchItem")
 
 
 @dataclass
-class PatchIndex(Generic[PatchItem]):
+class PatchIndex[PatchItem]:
     """Metadata for a single patch in a data cube."""
 
     """Unique identifier for the patch."""

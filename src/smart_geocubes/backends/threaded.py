@@ -161,15 +161,26 @@ class ThreadedBackend(DownloadBackend):
 
         futures = [self.download_pool.submit(self._download_in_pool, i) for i in idx]
 
-        _, failed = wait(futures)
+        done, not_done = wait(futures)
+        if len(not_done) > 0:
+            raise RuntimeError(f"Downloading not completed for {len(not_done)} patches.")
+
+        # Check if any of the downloads raised an exception        for f in done:
+        failed = [f for f in done if f.exception() is not None]
         if len(failed) > 0:
-            raise RuntimeError(f"Downloading failed for {len(failed)} patches.")
+            raise RuntimeError(f"Downloading failed for {len(failed)} patches.") from failed[0].exception()
 
         # Check if the queue is still alive
         if self.write_queue.is_shutdown:
             raise RuntimeError(
                 "Write queue is not alive. This happens if the writer thread crashes or the backend is closed."
             )
+        # Check how many tasks are currently in the queue
+        queue_size = self.write_queue.qsize()
+        logger.debug(f"{len(idx)} patches submitted for download. {queue_size} patches currently in the write queue.")
         with self.write_queue.mutex:
-            self.write_queue.all_tasks_done.wait()
+            if self.write_queue.unfinished_tasks > 0:
+                self.write_queue.all_tasks_done.wait()
+            else:
+                logger.debug("No patches currently being written. All submitted patches were written immediately.")
         logger.debug("All submitted patches downloaded and written.")

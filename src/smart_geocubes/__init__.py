@@ -11,6 +11,7 @@ from smart_geocubes.datasets.tctrend import TCTrend as TCTrend
 from smart_geocubes.datasets.tctrend import TCTrend2019 as TCTrend2019
 from smart_geocubes.datasets.tctrend import TCTrend2020 as TCTrend2020
 from smart_geocubes.datasets.tctrend import TCTrend2022 as TCTrend2022
+from smart_geocubes.datasets.tctrend import TCTrend2024 as TCTrend2024
 
 try:
     __version__ = importlib.metadata.version("smart-geocubes")

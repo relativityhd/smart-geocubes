@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "A high-performance library for intelligent loading and caching of remote geospatial raster data, built with xarray and zarr."
 readme = "README.md"
 authors = [{ name = "relativityhd", email = "tobiashoelzer@hotmail.com" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "geopandas>=1.0.0",
     "icechunk>=1.1,<2",
@@ -12,7 +12,7 @@ dependencies = [
     "odc-geo>=0.4.5,<0.5",
     "stopuhr>=0.0.3",
     "xarray>=2025.1.1",
-    "zarr>=3.1,<4",
+    "zarr>=3.1.4,<4",
 ]
 license = "MIT"
 license-files = ["LICENSE"]

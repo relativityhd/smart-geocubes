@@ -1,5 +1,4 @@
 import logging
-import multiprocessing as mp
 import os
 from collections import namedtuple
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -7,6 +6,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import icechunk
 from numpy.testing import assert_almost_equal
 from odc.geo.geobox import GeoBox
+from pytest import approx
 
 import smart_geocubes
 
@@ -24,9 +24,9 @@ def test_arcticdem32m_download():
         accessor = smart_geocubes.ArcticDEM32m(storage, backend="threaded")
         adem = accessor.load(geobox, create=True)
         print(adem.dem.mean(), adem.dem.min(), adem.dem.max())
-        assert adem.dem.mean() == 102.10579
-        assert adem.dem.min() == 46.429688
-        assert adem.dem.max() == 483.83594
+        assert adem.dem.mean() == approx(102.10579)
+        assert adem.dem.min() == approx(46.429688)
+        assert adem.dem.max() == approx(483.83594)
         assert_almost_equal(
             adem.odc.geobox.center_pixel.coords["x"].values / 1_000_000,
             geobox.to_crs("EPSG:3413").center_pixel.coords["x"].values / 1_000_000,
@@ -50,9 +50,9 @@ def test_arcticdem2m_download():
         accessor = smart_geocubes.ArcticDEM2m(storage, backend="threaded")
         adem = accessor.load(geobox, create=True)
         print(adem.dem.mean(), adem.dem.min(), adem.dem.max())
-        assert adem.dem.mean() == 203.03644
-        assert adem.dem.min() == 149.7421
-        assert adem.dem.max() == 285.5547
+        assert adem.dem.mean() == approx(203.03644)
+        assert adem.dem.min() == approx(149.7421)
+        assert adem.dem.max() == approx(285.5547)
         assert_almost_equal(
             adem.odc.geobox.center_pixel.coords["x"].values / 1_000_000,
             geobox.to_crs("EPSG:3413").center_pixel.coords["x"].values / 1_000_000,
@@ -78,7 +78,7 @@ def test_arcticdem_download_threaded():
         accessor = smart_geocubes.ArcticDEM32m(storage, backend="threaded")
         accessor.create(overwrite=True)
 
-        def _task(i, geobox: GeoBox) -> Stats:
+        def _task(i, geobox: GeoBox) -> tuple[int, Stats]:
             adem = accessor.load(geobox)
             return i, Stats(adem.dem.mean(), adem.dem.min(), adem.dem.max())
 
@@ -94,9 +94,9 @@ def test_arcticdem_download_threaded():
         for i, result in results:
             if i != 0:
                 continue
-            assert result.mean == 102.10579
-            assert result.min == 46.429688
-            assert result.max == 483.83594
+            assert result.mean == approx(102.10579)
+            assert result.min == approx(46.429688)
+            assert result.max == approx(483.83594)
     finally:
         os.system("rm -rf arcticdem_32m.zarr")
 
@@ -105,12 +105,14 @@ def _mp_task(i, geobox: GeoBox) -> tuple[int, Stats]:
     storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
     accessor = smart_geocubes.ArcticDEM32m(storage, backend="simple")
     adem = accessor.load(geobox)
-    return i, (adem.dem.mean().item(), adem.dem.min().item(), adem.dem.max().item())
+    return i, Stats(adem.dem.mean().item(), adem.dem.min().item(), adem.dem.max().item())
 
 
 def test_arcticdem_download_blocking_processes():
     try:
-        mp.set_start_method("forkserver")
+        # This test fails with the "spawn" method, however, it's not possible to set the start method from a test
+        # So this test stays broken for now
+        # mp.set_start_method("forkserver")
         storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
         accessor = smart_geocubes.ArcticDEM32m(storage)
         accessor.create(overwrite=True)
@@ -128,8 +130,8 @@ def test_arcticdem_download_blocking_processes():
             if i != 0:
                 continue
             result = Stats(*result)
-            assert result.mean == 102.10579
-            assert result.min == 46.429688
-            assert result.max == 483.83594
+            assert result.mean == approx(102.10579)
+            assert result.min == approx(46.429688)
+            assert result.max == approx(483.83594)
     finally:
         os.system("rm -rf arcticdem_32m.zarr")

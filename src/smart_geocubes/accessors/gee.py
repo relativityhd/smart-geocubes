@@ -151,8 +151,8 @@ class GEEMosaicAccessor(RemoteAccessor):
 
         """
         import ee
-        import rioxarray  # noqa: F401
-        import xee  # noqa: F401
+        import rioxarray
+        import xee
 
         # Note: This is a little bit weird: First we create an own grid which overlaps to the chunks
         # of the zarr array. Then we create a mosaic of the data and clip it to a single chunk.
@@ -189,7 +189,7 @@ class GEEMosaicAccessor(RemoteAccessor):
             patch = patch.transpose("y", "x")
 
         # Download the data
-        logger.debug(f"{idx.id=}: Trigger GEE download)")
+        logger.debug(f"{idx.id=}: Trigger GEE download")
         patch.load()
         logger.debug(f"{idx.id=}: Finished GEE download")
         logging.getLogger("urllib3.connectionpool").disabled = False
@@ -199,6 +199,12 @@ class GEEMosaicAccessor(RemoteAccessor):
 
         # For some reason xee does not always set the crs
         patch = patch.odc.assign_crs(self.extent.crs)
+
+        if self.extent.crs.to_epsg() == 4326 and idx.item.geobox.affine[2] < -180:
+            # BBox of tile wraps WEST around antimeridian and has western hemisphere coordinates
+            # patch will however have eastern hemispheric coordinates (> +179.xx)
+            # move the patch x-coordinates also into the western hemisphere
+            patch["x"] = patch.x - 360
 
         # Recrop the data to the tile, since gee does not always return the exact extent
         patch = patch.odc.crop(idx.item.geobox.extent)
