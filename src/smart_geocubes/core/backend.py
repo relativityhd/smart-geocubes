@@ -5,7 +5,7 @@ import logging
 import threading
 from collections.abc import Callable
 from datetime import datetime
-from typing import TypedDict
+from typing import TypedDict, cast
 
 import icechunk
 import numpy as np
@@ -210,6 +210,7 @@ class DownloadBackend(abc.ABC):
             session = self.repo.readonly_session("main")
         self.assert_created(session)
         zcube = zarr.open(store=session.store, mode="r")
+        assert isinstance(zcube, zarr.Group), "Expected a zarr group at the root of the store."
         return zcube
 
     def open_xarray(self, session: icechunk.Session | None = None) -> xr.Dataset:
@@ -233,7 +234,8 @@ class DownloadBackend(abc.ABC):
 
         """
         zcube = self.open_zarr(session)
-        loaded_patches = zcube.attrs.get("loaded_patches", [])
+        loaded_patches = cast(list[str], zcube.attrs.get("loaded_patches", []))
+        assert isinstance(loaded_patches, list), "Expected 'loaded_patches' attribute to be a list of strings."
         return loaded_patches
 
     def _get_target_slice(
@@ -251,7 +253,7 @@ class DownloadBackend(abc.ABC):
         assert "time" in patch.dims, "Geocube is temporal - patches need a time dimension."
         assert len(patch.time) >= 1, "Patch must have at least one time step."
 
-        extent = xcube.get_index("time").normalize()
+        extent = xcube.get_index("time").normalize()  # ty:ignore[unresolved-attribute]
         temporal_target = extent.get_indexer(patch.time.values, method="nearest")
 
         logger.debug(f"Writing to temporal {temporal_target=} and spatial {spatial_target=}.")
@@ -264,9 +266,9 @@ class DownloadBackend(abc.ABC):
         self._log_event(f"start_write_{var}", patch_id)
         mask = np.isnan(data)
         if np.any(mask):
-            existing_data = zcube[var][target]
-            data[mask] = existing_data[mask]
-        zcube[var][target] = data
+            existing_data = zcube[var][target]  # ty:ignore[invalid-argument-type]
+            data[mask] = existing_data[mask]  # ty:ignore[not-subscriptable, invalid-argument-type]
+        zcube[var][target] = data  # ty:ignore[invalid-assignment]
         self._log_event(f"end_write_{var}", patch_id)
 
     def _download_from_source_with_retries(self, idx: PatchIndex) -> xr.Dataset:

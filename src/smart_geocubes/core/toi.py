@@ -24,7 +24,7 @@ def normalize_toi(extent: pd.DatetimeIndex, toi: TOI, method="nearest") -> pd.Da
 
     """
     # Normalize the extent
-    extent = extent.normalize()
+    extent = extent.normalize()  # ty:ignore[unresolved-attribute]
 
     if toi is None:
         return extent
@@ -42,7 +42,7 @@ def normalize_toi(extent: pd.DatetimeIndex, toi: TOI, method="nearest") -> pd.Da
     return toi_norm
 
 
-def extract_toi_range(toi: TOI) -> str | datetime | tuple[str, str] | tuple[datetime | datetime] | None:
+def extract_toi_range(toi: TOI) -> str | datetime | tuple[str, str] | tuple[datetime, datetime] | None:
     """Extract the datetime range or a specific datetime from the time of interest (toi).
 
     Args:

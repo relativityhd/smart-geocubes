@@ -18,6 +18,8 @@ from smart_geocubes.accessors.stac import STACAccessor
 from smart_geocubes.core import TOI, PatchIndex
 
 if TYPE_CHECKING:
+    from pystac import Item
+
     try:
         import matplotlib.pyplot as plt
     except ImportError:
@@ -186,7 +188,7 @@ class ArcticDEMABC(STACAccessor):
         """Download the ArcticDEM mosaic extent info and store it in the datacube."""
         _download_arcticdem_extent(self._aux_dir)
 
-    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex]:
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex["Item"]]:
         """Get adjacent patch indexes from a STAC API.
 
         Overwrite the default implementation from the STAC accessor
@@ -234,7 +236,7 @@ class ArcticDEMABC(STACAccessor):
         return [
             LazyStacPatchIndex(tile.dem_id, _get_stac_url(tile.dem_id, resolution))
             for tile in adjacent_tiles.itertuples()
-        ]
+        ]  # ty:ignore[invalid-return-type]
 
     def visualize_state(self, ax: "plt.Axes | None" = None) -> "plt.Figure | plt.Axes":
         """Visulize the extend, hence the already downloaded and filled data, of the datacube.
@@ -268,18 +270,18 @@ class ArcticDEMABC(STACAccessor):
             fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"projection": projection})
 
         # Set the extent to focus on the North Pole
-        ax.set_extent([-180, 180, 50, 90], crs=ccrs.PlateCarree())
+        ax.set_extent([-180, 180, 50, 90], crs=ccrs.PlateCarree())  # ty:ignore[unresolved-attribute]
 
         # Add features
-        ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black", facecolor="white")
-        ax.add_feature(cfeature.OCEAN, zorder=0, facecolor="lightgrey")
-        ax.add_feature(cfeature.COASTLINE)
-        ax.add_feature(cfeature.BORDERS, linestyle=":")
-        ax.add_feature(cfeature.LAKES, alpha=0.5)
-        ax.add_feature(cfeature.RIVERS)
+        ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black", facecolor="white")  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.OCEAN, zorder=0, facecolor="lightgrey")  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.COASTLINE)  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.BORDERS, linestyle=":")  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.LAKES, alpha=0.5)  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.RIVERS)  # ty:ignore[unresolved-attribute]
 
         # Add gridlines
-        gl = ax.gridlines(draw_labels=True)
+        gl = ax.gridlines(draw_labels=True)  # ty:ignore[unresolved-attribute]
         gl.top_labels = False
         gl.right_labels = False
 
@@ -291,7 +293,7 @@ class ArcticDEMABC(STACAccessor):
         verts = np.vstack([np.sin(theta), np.cos(theta)]).T
         circle = mpath.Path(verts * radius + center)
 
-        ax.set_boundary(circle, transform=ax.transAxes)
+        ax.set_boundary(circle, transform=ax.transAxes)  # ty:ignore[unresolved-attribute]
 
         tile_info.plot(
             "title",

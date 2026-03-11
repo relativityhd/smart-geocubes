@@ -1,6 +1,7 @@
 """Write specific backends."""
 
 import logging
+from typing import cast
 
 import xarray as xr
 import zarr
@@ -19,6 +20,7 @@ class SimpleBackend(DownloadBackend):
 
         session = self.repo.writable_session("main")
         zcube = zarr.open(session.store, mode="r+")
+        assert isinstance(zcube, zarr.Group), "Expected the zarr store to be a zarr Group."
 
         loaded_patches = self.loaded_patches(session)
         if patch_id in loaded_patches:
@@ -27,7 +29,8 @@ class SimpleBackend(DownloadBackend):
 
         target = self._get_target_slice(patch)
 
-        for var in patch.data_vars:
+        data_vars = cast(list[str], list(patch.data_vars.keys()))
+        for var in data_vars:
             self._write_patch_variable(zcube, patch[var].data, var, target, patch_id)
 
         loaded_patches.append(patch_id)

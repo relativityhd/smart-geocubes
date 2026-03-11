@@ -15,17 +15,16 @@ class CoordEncoding(TypedDict):
     """TypedDict for the encoding of regularly spaced coordinates."""
 
     compressors: list[BytesBytesCodec]
-    filters: list[BytesBytesCodec]
+    # filters: list[BytesBytesCodec]
 
 
-def optimize_coord_encoding(values: np.ndarray, dx: int) -> CoordEncoding:
+def optimize_coord_encoding(values: np.ndarray) -> CoordEncoding:
     """Optimize zarr encoding of regularly spaced coordinates.
 
     Taken from https://github.com/earth-mover/serverless-datacube-demo/blob/a15423b9734898f52468bebc441e29ccf3789410/src/lib.py#L280
 
     Args:
         values (np.ndarray): The coordinates to encode
-        dx (int): The spacing between the coordinates
 
     Returns:
         CoordEncoding: A dictionary containing the zarr compressors and filters to use for encoding the coordinates.

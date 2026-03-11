@@ -4,6 +4,7 @@ import logging
 import warnings
 from dataclasses import dataclass
 from functools import cached_property
+from typing import cast
 
 import geopandas as gpd
 import pandas as pd
@@ -51,6 +52,7 @@ class GEEMosaicAccessor(RemoteAccessor):
             {"idx": idx, "geometry": self._extent_tiles[idx].boundingbox.polygon.geom}
             for idx in self._extent_tiles._all_tiles()
         ]
+        assert self.extent.crs is not None, "Expected extent to have a CRS."
         return gpd.GeoDataFrame(data, crs=self.extent.crs.to_wkt())
 
     @cached_property
@@ -75,7 +77,7 @@ class GEEMosaicAccessor(RemoteAccessor):
         else:
             raise ValueError(f"Invalid index string: {idx}")
 
-    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[Item]:
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex[Item]]:
         """Get the adjacent patches for the given geobox.
 
         Must be implemented by the Accessor.
@@ -92,6 +94,7 @@ class GEEMosaicAccessor(RemoteAccessor):
             ValueError: If the datacube is not temporal, but a time of interest is provided.
 
         """
+        assert self.extent.crs is not None, "Expected extent to have a CRS."
         if toi is not None and not self.is_temporal:
             raise ValueError("Datacube is not temporal, but time of interest is provided.")
 
@@ -116,12 +119,13 @@ class GEEMosaicAccessor(RemoteAccessor):
                     self._stringify_index(spatial_idx),
                     self._extent_tiles[spatial_idx].geographic_extent,
                     None,
-                    Item(self._extent_tiles[spatial_idx], None),
+                    Item(self._extent_tiles[spatial_idx], None),  # ty:ignore[invalid-argument-type]
                 )
                 for spatial_idx in spatial_idxs
             ]
 
         # Now datacube is temporal
+        assert self.temporal_extent is not None, "Expected temporal extent to be set for temporal datacube."
         toi = normalize_toi(self.temporal_extent, toi)
         patch_idxs = []
         for time in toi:
@@ -133,7 +137,7 @@ class GEEMosaicAccessor(RemoteAccessor):
                         self._stringify_index(spatial_idx, time_idx),
                         self._extent_tiles[spatial_idx].geographic_extent,
                         time,
-                        Item(self._extent_tiles[spatial_idx], time),
+                        Item(self._extent_tiles[spatial_idx], time),  # ty:ignore[invalid-argument-type]
                     )
                 )
         return patch_idxs
@@ -154,6 +158,10 @@ class GEEMosaicAccessor(RemoteAccessor):
         import rioxarray
         import xee
 
+        assert idx.item is not None, "Expected PatchIndex to have an item."
+        assert self.extent.crs is not None, "Expected extent to have a CRS."
+        assert self.extent.crs.to_epsg() is not None, "Expected extent CRS to have an EPSG code."
+
         # Note: This is a little bit weird: First we create an own grid which overlaps to the chunks
         # of the zarr array. Then we create a mosaic of the data and clip it to a single chunk.
         # We could load the images from the collection directly instead of creating a mosaic.
@@ -163,14 +171,14 @@ class GEEMosaicAccessor(RemoteAccessor):
 
         ee_col = ee.ImageCollection(self.collection)
         if self.is_temporal:
-            ee_col = ee_col.filterDate(idx.item.time)
+            ee_col = cast(ee.ImageCollection, ee_col.filterDate(idx.item.time))
         geom = ee.Geometry.Rectangle(idx.item.geobox.geographic_extent.boundingbox)
         ee_img = ee_col.mosaic().clip(geom)
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, message=EE_WARN_MSG)
             patch = xr.open_dataset(
-                ee_img,
+                ee_img,  # ty:ignore[invalid-argument-type]
                 engine="ee",
                 geometry=geom,
                 crs=f"epsg:{self.extent.crs.to_epsg()}",
@@ -220,6 +228,8 @@ class GEEMosaicAccessor(RemoteAccessor):
         """
         import geopandas as gpd
 
+        assert self.extent.crs is not None, "Expected extent to have a CRS."
+
         if not self.created:
             return None
 
@@ -233,6 +243,7 @@ class GEEMosaicAccessor(RemoteAccessor):
             spatial_idx, temporal_idx = self._parse_index(pid)
             geometry = self._extent_tiles[spatial_idx].extent.geom
             if self.is_temporal:
+                assert self.temporal_extent is not None, "Expected temporal extent to be set for temporal datacube."
                 time = self.temporal_extent[temporal_idx]
                 patch_infos.append({"geometry": geometry, "id": pid, "time": time})
             else:

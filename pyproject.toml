@@ -9,7 +9,7 @@ dependencies = [
     "geopandas>=1.0.0",
     "icechunk>=1.1,<2",
     "numpy>=2.0.0,<3",
-    "odc-geo>=0.4.5,<0.5",
+    "odc-geo>=0.4.5,<0.6",
     "stopuhr>=0.0.3",
     "xarray>=2025.1.1",
     "zarr>=3.1.4,<4",
@@ -75,7 +75,8 @@ dev = [
     "ipywidgets>=8.1.5",
     "jupyterlab>=4.5.0",
     "rich>=13.9.4",
-    "ruff>=0.9.5",
+    "ruff>=0.15.5",
+    "ty>=0.0.21",
 ]
 tests = ["pytest>=8.3.4"]
 docs = [

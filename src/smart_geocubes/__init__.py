@@ -13,7 +13,7 @@ from smart_geocubes.datasets.tctrend import TCTrend2020 as TCTrend2020
 from smart_geocubes.datasets.tctrend import TCTrend2022 as TCTrend2022
 from smart_geocubes.datasets.tctrend import TCTrend2024 as TCTrend2024
 
-try:
+try:  # noqa: RUF067
     __version__ = importlib.metadata.version("smart-geocubes")
 except importlib.metadata.PackageNotFoundError:
     __version__ = "0.0.0"

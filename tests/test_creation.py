@@ -12,7 +12,7 @@ from smart_geocubes.core import RemoteAccessor
 
 
 class AccessorDegree(RemoteAccessor):
-    extent: GeoBox = GeoBox.from_bbox([-1, -1, 1, 1], crs="EPSG:4326", resolution=0.0001)
+    extent: GeoBox = GeoBox.from_bbox((-1, -1, 1, 1), crs="EPSG:4326", resolution=0.0001)
     temporal_extent: None = None
     chunk_size: int = 100
     channels: ClassVar[list] = ["red", "green", "blue"]
@@ -29,9 +29,6 @@ class AccessorDegree(RemoteAccessor):
     def download_patch(self, idx):
         pass
 
-    def procedural_download(self, geobox):
-        pass
-
     def current_state(self):
         pass
 
@@ -40,7 +37,7 @@ class AccessorDegree(RemoteAccessor):
 
 
 class AccessorMeter(RemoteAccessor):
-    extent: GeoBox = GeoBox.from_bbox([-10000, -10000, 10000, 10000], crs="EPSG:3857", resolution=1)
+    extent: GeoBox = GeoBox.from_bbox((-10000, -10000, 10000, 10000), crs="EPSG:3857", resolution=1)
     temporal_extent: pd.DatetimeIndex = pd.date_range("2020-01-01", periods=3, freq="D")
     chunk_size: int = 100
     channels: ClassVar[list] = ["red", "green", "blue"]
@@ -55,9 +52,6 @@ class AccessorMeter(RemoteAccessor):
         pass
 
     def download_patch(self, idx):
-        pass
-
-    def procedural_download(self, geobox):
         pass
 
     def current_state(self):

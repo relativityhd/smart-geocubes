@@ -23,11 +23,11 @@ def correct_bounds(tile: xr.Dataset, zgeobox: GeoBox) -> xr.Dataset:
         tile (xr.Dataset): The tile to correct.
         zgeobox (GeoBox): The GeoBox to correct the tile to.
 
-    Raises:
-        ValueError: If the tile is out of the geobox's bounds.
-
     Returns:
         xr.Dataset: The corrected tile.
+
+    Raises:
+        ValueError: If the tile is out of the geobox's bounds.
 
     """
     yslice, xslice = tile.odc.geobox.overlap_roi(zgeobox)
@@ -84,8 +84,8 @@ class STACAccessor(RemoteAccessor):
         """
         import pystac_client
 
-        if self.is_temporal:
-            toi = extract_toi_range(self.temporal_extent, toi)
+        if self.is_temporal and toi is not None:
+            toi_range = extract_toi_range(toi)
 
         catalog = pystac_client.Client.open(self.stac_api_url)
         if isinstance(roi, gpd.GeoDataFrame):
@@ -97,16 +97,21 @@ class STACAccessor(RemoteAccessor):
         else:
             raise ValueError("Invalid ROI type.")
 
-        search = catalog.search(collections=[self.collection], intersects=geom, datetime=toi)
+        search = catalog.search(collections=[self.collection], intersects=geom, datetime=toi_range)
         items = list(search.items())
 
         patch_idxs = []
         for item in items:
+            assert item.geometry is not None, "Expected item to have a geometry."
             geom = Geometry(item.geometry, crs="EPSG:4326")
             if self.is_temporal:
                 if item.datetime is not None:
                     idx = PatchIndex(item.id, geom, item.datetime, item)
                 else:
+                    assert (
+                        item.common_metadata.start_datetime is not None
+                        and item.common_metadata.end_datetime is not None
+                    ), "Expected item to have a datetime or start_datetime and end_datetime in common_metadata."
                     idx = PatchIndex(
                         item.id, geom, (item.common_metadata.start_datetime, item.common_metadata.end_datetime), item
                     )
@@ -129,6 +134,7 @@ class STACAccessor(RemoteAccessor):
         """
         from odc.stac import stac_load
 
+        assert idx.item is not None, "Expected PatchIndex to have an item."
         patch = stac_load([idx.item], bands=self.channels, chunks=None, progress=None)
 
         # Do a mosaic if multiple items are returned for non-temporal data

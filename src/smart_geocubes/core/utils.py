@@ -28,10 +28,15 @@ def _check_python_version(min_major: int, min_minor: int) -> bool:
 
 
 def _geobox_repr(geobox: GeoBox) -> str:
-    crs = f"EPSG:{geobox.crs.epsg}" if geobox.crs.epsg else "Non-EPSG CRS"
+    if geobox.crs is not None:
+        crs = f"EPSG:{geobox.crs.epsg}" if geobox.crs is not None and geobox.crs.epsg else "Non-EPSG CRS"
 
-    is_degrees = geobox.crs.units[0].startswith("degree")
-    is_meter = geobox.crs.units[0].startswith("metre") or geobox.crs.units[0].startswith("meter")
+        is_degrees = geobox.crs.units[0].startswith("degree")
+        is_meter = geobox.crs.units[0].startswith("metre") or geobox.crs.units[0].startswith("meter")
+    else:
+        crs = "Unknown CRS"
+        res = f"{abs(geobox.affine.a)} x {abs(geobox.affine.e)}"
+        is_degrees = is_meter = False
 
     if is_degrees:
         res = f"{abs(geobox.affine.a):.5f}° x {abs(geobox.affine.e):.5f}°"
@@ -39,15 +44,18 @@ def _geobox_repr(geobox: GeoBox) -> str:
         res = f"{abs(geobox.affine.a):.1f}m x {abs(geobox.affine.e):.1f}m"
     else:
         res = f"{abs(geobox.affine.a)} x {abs(geobox.affine.e)}"
-
     return f"GeoBox({geobox.shape}, {res} @ [{geobox.affine.c}, {geobox.affine.f}] in {crs})"
 
 
 def _geometry_repr(geometry: Geometry) -> str:
-    crs = f"EPSG:{geometry.crs.epsg}" if geometry.crs.epsg else "Non-EPSG CRS"
+    if geometry.crs is not None:
+        crs = f"EPSG:{geometry.crs.epsg}" if geometry.crs.epsg else "Non-EPSG CRS"
 
-    is_degrees = geometry.crs.units[0].startswith("degree")
-    is_meter = geometry.crs.units[0].startswith("metre") or geometry.crs.units[0].startswith("meter")
+        is_degrees = geometry.crs.units[0].startswith("degree")
+        is_meter = geometry.crs.units[0].startswith("metre") or geometry.crs.units[0].startswith("meter")
+    else:
+        crs = "Unknown CRS"
+        is_degrees = is_meter = False
 
     x, y = geometry.centroid.xy
     x, y = x[0], y[0]

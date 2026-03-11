@@ -5,6 +5,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, wait
 from queue import Queue
 from threading import Thread
+from typing import cast
 
 import icechunk
 import xarray as xr
@@ -56,7 +57,9 @@ class ThreadedBackend(DownloadBackend):
         self.download_pool.shutdown(wait=False, cancel_futures=True)
         logger.debug("Download pool shut down.")
 
-        self.write_queue.shutdown(immediate=True)
+        # We can assume that shutdown is present (even if ty sais otherwise) because this backend
+        # is only available for Python 3.13 and above, where the shutdown method is available for queues
+        self.write_queue.shutdown(immediate=True)  # ty:ignore[unresolved-attribute]
         logger.debug("Write queue shut down.")
 
         self.writer.join()
@@ -111,6 +114,7 @@ class ThreadedBackend(DownloadBackend):
 
         session = self.repo.writable_session("main")
         zcube = zarr.open(session.store, mode="r+")
+        assert isinstance(zcube, zarr.Group), "Expected the zarr store to be a zarr Group."
 
         loaded_patches = self.loaded_patches(session)
         if patch_id in loaded_patches:
@@ -119,9 +123,10 @@ class ThreadedBackend(DownloadBackend):
 
         target = self._get_target_slice(patch, session)
 
+        data_vars = cast(list[str], list(patch.data_vars.keys()))
         futures = {
             self.writing_pool.submit(self._write_patch_variable, zcube, patch[var].data, var, target, patch_id): var
-            for var in patch.data_vars
+            for var in data_vars
         }
         _, failed = wait(futures)
         if len(failed) > 0:
@@ -171,7 +176,9 @@ class ThreadedBackend(DownloadBackend):
             raise RuntimeError(f"Downloading failed for {len(failed)} patches.") from failed[0].exception()
 
         # Check if the queue is still alive
-        if self.write_queue.is_shutdown:
+        # We can assume that shutdown is present (even if ty sais otherwise) because this backend
+        # is only available for Python 3.13 and above, where the shutdown method is available for queues
+        if self.write_queue.is_shutdown:  # ty:ignore[unresolved-attribute]
             raise RuntimeError(
                 "Write queue is not alive. This happens if the writer thread crashes or the backend is closed."
             )

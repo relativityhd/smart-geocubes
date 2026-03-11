@@ -3,7 +3,7 @@
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Literal, TypedDict, Unpack
+from typing import TYPE_CHECKING, ClassVar, Literal, TypedDict, Unpack, cast
 
 import geopandas as gpd
 import icechunk
@@ -161,7 +161,9 @@ class RemoteAccessor(ABC):
         """
         session = self.repo.readonly_session("main")
         zcube = zarr.open(store=session.store, mode="r")
-        return zcube.attrs.get("loaded_patches", []).copy()
+        loaded_patches = cast(list[str], zcube.attrs.get("loaded_patches", []))
+        assert isinstance(loaded_patches, list), "Expected 'loaded_patches' attribute to be a list of strings."
+        return loaded_patches.copy()
 
     def assert_created(self):
         """Assert that the datacube exists in the storage."""
@@ -227,7 +229,7 @@ class RemoteAccessor(ABC):
 
             logger.debug(
                 f"Creating an empty zarr datacube '{self.title}' with the variables"
-                f" {self.channels} at a {self.extent.resolution=} (epsg:{self.extent.crs.epsg})"
+                f" {self.channels} at a {self.extent.resolution=}"
                 f" and {self.chunk_size=} to {session.store=}"
             )
 
@@ -235,7 +237,7 @@ class RemoteAccessor(ABC):
                 {
                     name: odc.geo.xr.xr_zeros(
                         self.extent,
-                        chunks=-1,
+                        chunks=(-1, -1),
                         dtype=self._channels_encoding[name].get("dtype", "float32"),
                         always_yx=True,
                     )
@@ -254,8 +256,8 @@ class RemoteAccessor(ABC):
 
             # Get the encoding for the coordinates, variables and spatial reference
             coords_encoding = {
-                "x": {"chunks": ds.x.shape, **optimize_coord_encoding(ds.x.values, self.extent.resolution.x)},
-                "y": {"chunks": ds.y.shape, **optimize_coord_encoding(ds.y.values, self.extent.resolution.y)},
+                "x": {"chunks": ds.x.shape, **optimize_coord_encoding(ds.x.values)},
+                "y": {"chunks": ds.y.shape, **optimize_coord_encoding(ds.y.values)},
             }
             if self.temporal_extent is not None:
                 coords_encoding["time"] = {"chunks": ds.time.shape, **optimize_temporal_encoding(self.temporal_extent)}
@@ -323,6 +325,7 @@ class RemoteAccessor(ABC):
         toi = None
         if "time" in ref.coords and self.temporal_extent is not None:
             toi = ref.get_index("time")
+            assert isinstance(toi, pd.DatetimeIndex), "Expected 'time' coordinate to be a pandas DatetimeIndex."
         return self.load(ref.geobox, toi=toi, **kwargs)
 
     def load(
@@ -366,6 +369,7 @@ class RemoteAccessor(ABC):
                 self.assert_created()
 
             # Download the adjacent tiles (if necessary)
+            assert self.extent.crs is not None, "Expected the datacube extent to have a defined CRS."
             aligned_aoi = aoi.to_crs(self.extent.crs)
             with self.stopuhr(f"{_geometry_repr(aoi)}: Procedural download of missing tiles"):
                 self.procedural_download(aligned_aoi, toi)

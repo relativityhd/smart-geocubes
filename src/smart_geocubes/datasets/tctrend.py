@@ -119,18 +119,18 @@ class TCTrendABC(GEEMosaicAccessor):
             fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"projection": projection})
 
         # Set the extent to show the whole world
-        ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())
+        ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())  # ty:ignore[unresolved-attribute]
 
         # Add features
-        ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black", facecolor="white")
-        ax.add_feature(cfeature.OCEAN, zorder=0, facecolor="lightgrey")
-        ax.add_feature(cfeature.COASTLINE)
-        ax.add_feature(cfeature.BORDERS, linestyle=":")
-        ax.add_feature(cfeature.LAKES, alpha=0.5)
-        ax.add_feature(cfeature.RIVERS)
+        ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black", facecolor="white")  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.OCEAN, zorder=0, facecolor="lightgrey")  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.COASTLINE)  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.BORDERS, linestyle=":")  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.LAKES, alpha=0.5)  # ty:ignore[unresolved-attribute]
+        ax.add_feature(cfeature.RIVERS)  # ty:ignore[unresolved-attribute]
 
         # Add gridlines
-        gl = ax.gridlines(draw_labels=True)
+        gl = ax.gridlines(draw_labels=True)  # ty:ignore[unresolved-attribute]
         gl.top_labels = False
         gl.right_labels = False
 
