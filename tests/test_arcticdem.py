@@ -23,10 +23,10 @@ def test_arcticdem32m_download():
         storage = icechunk.local_filesystem_storage("arcticdem_32m.zarr")
         accessor = smart_geocubes.ArcticDEM32m(storage, backend="threaded")
         adem = accessor.load(geobox, create=True)
-        print(adem.dem.mean(), adem.dem.min(), adem.dem.max())
-        assert adem.dem.mean() == approx(102.10579)
-        assert adem.dem.min() == approx(46.429688)
-        assert adem.dem.max() == approx(483.83594)
+        print(adem.dem.mean().item(), adem.dem.min().item(), adem.dem.max().item())
+        assert adem.dem.mean().item() == approx(102.10579)
+        assert adem.dem.min().item() == approx(46.429688)
+        assert adem.dem.max().item() == approx(483.83594)
         assert_almost_equal(
             adem.odc.geobox.center_pixel.coords["x"].values / 1_000_000,
             geobox.to_crs("EPSG:3413").center_pixel.coords["x"].values / 1_000_000,
@@ -49,10 +49,10 @@ def test_arcticdem2m_download():
         storage = icechunk.local_filesystem_storage("arcticdem_2m.zarr")
         accessor = smart_geocubes.ArcticDEM2m(storage, backend="threaded")
         adem = accessor.load(geobox, create=True)
-        print(adem.dem.mean(), adem.dem.min(), adem.dem.max())
-        assert adem.dem.mean() == approx(203.03644)
-        assert adem.dem.min() == approx(149.7421)
-        assert adem.dem.max() == approx(285.5547)
+        print(adem.dem.mean().item(), adem.dem.min().item(), adem.dem.max().item())
+        assert adem.dem.mean().item() == approx(203.03644)
+        assert adem.dem.min().item() == approx(149.7421)
+        assert adem.dem.max().item() == approx(285.5547)
         assert_almost_equal(
             adem.odc.geobox.center_pixel.coords["x"].values / 1_000_000,
             geobox.to_crs("EPSG:3413").center_pixel.coords["x"].values / 1_000_000,
@@ -80,7 +80,7 @@ def test_arcticdem_download_threaded():
 
         def _task(i, geobox: GeoBox) -> tuple[int, Stats]:
             adem = accessor.load(geobox)
-            return i, Stats(adem.dem.mean(), adem.dem.min(), adem.dem.max())
+            return i, Stats(adem.dem.mean().item(), adem.dem.min().item(), adem.dem.max().item())
 
         geoboxes = [
             GeoBox.from_bbox((150, 65, 151, 65.5), shape=(1000, 1000)),
