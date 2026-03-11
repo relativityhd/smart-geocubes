@@ -14,7 +14,6 @@ from odc.geo.geom import Geometry
 from smart_geocubes.core import TOI, PatchIndex, RemoteAccessor, normalize_toi
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 EE_WARN_MSG = "Unable to retrieve 'system:time_start' values from an ImageCollection due to: No 'system:time_start' values found in the 'ImageCollection'."  # noqa: E501
 
@@ -152,10 +151,8 @@ class GEEMosaicAccessor(RemoteAccessor):
 
         """
         import ee
-        import rioxarray  # noqa: F401
-        import xee  # noqa: F401
-
-        logger.debug(f"GEE Accessor for collection '{self.collection}' downloading {tile.item.geographic_extent.boundingbox}")
+        import rioxarray
+        import xee
 
         # Note: This is a little bit weird: First we create an own grid which overlaps to the chunks
         # of the zarr array. Then we create a mosaic of the data and clip it to a single chunk.
@@ -192,7 +189,7 @@ class GEEMosaicAccessor(RemoteAccessor):
             patch = patch.transpose("y", "x")
 
         # Download the data
-        logger.debug(f"{idx.id=}: Trigger GEE download)")
+        logger.debug(f"{idx.id=}: Trigger GEE download")
         patch.load()
         logger.debug(f"{idx.id=}: Finished GEE download")
         logging.getLogger("urllib3.connectionpool").disabled = False
@@ -203,7 +200,7 @@ class GEEMosaicAccessor(RemoteAccessor):
         # For some reason xee does not always set the crs
         patch = patch.odc.assign_crs(self.extent.crs)
 
-        if idx.item.affine[2] < -180:
+        if self.extent.crs.to_epsg() == 4326 and idx.item.geobox.affine[2] < -180:
             # BBox of tile wraps WEST around antimeridian and has western hemisphere coordinates
             # patch will however have eastern hemispheric coordinates (> +179.xx)
             # move the patch x-coordinates also into the western hemisphere

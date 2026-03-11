@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from collections import namedtuple
 
 import xarray as xr
 from odc.geo.geobox import GeoBox
@@ -59,27 +60,30 @@ def _geometry_repr(geometry: Geometry) -> str:
     return f"Geometry({center_str} in {crs})"
 
 
+_Extent = namedtuple("_Extent", ["min", "max"])
+
+
 def _log_xcube_stats(xcube: xr.Dataset, prefix: str = "xcube"):
     is_degrees = xcube.odc.geobox.crs.units[0].startswith("degree")
     is_meter = xcube.odc.geobox.crs.units[0].startswith("metre") or xcube.odc.geobox.crs.units[0].startswith("meter")
 
-    x_extent = xcube.x[0].item(), xcube.x[1].item()
-    y_extent = xcube.y[0].item(), xcube.y[1].item()
+    x_extent = _Extent(xcube.x[0].item(), xcube.x[-1].item())
+    y_extent = _Extent(xcube.y[0].item(), xcube.y[-1].item())
     x_res = abs(xcube.x[1] - xcube.x[0]).item()
     y_res = abs(xcube.y[1] - xcube.y[0]).item()
     if is_degrees:
-        x_extent = f"{x_extent[0]:.5f}° - {x_extent[1]:.5f}°"
-        y_extent = f"{y_extent[0]:.5f}° - {y_extent[1]:.5f}°"
+        x_extent = f"{x_extent.min:.5f}° - {x_extent.max:.5f}°"
+        y_extent = f"{y_extent.min:.5f}° - {y_extent.max:.5f}°"
         x_res = f"{x_res:.5f}°"
         y_res = f"{y_res:.5f}°"
     elif is_meter:
-        x_extent = f"{x_extent[0]:.1f}m - {x_extent[1]:.1f}m"
-        y_extent = f"{y_extent[0]:.1f}m - {y_extent[1]:.1f}m"
+        x_extent = f"{x_extent.min:.1f}m - {x_extent.max:.1f}m"
+        y_extent = f"{y_extent.min:.1f}m - {y_extent.max:.1f}m"
         x_res = f"{x_res:.1f}m"
         y_res = f"{y_res:.1f}m"
     else:
-        x_extent = f"{x_extent[0]} - {x_extent[1]}"
-        y_extent = f"{y_extent[0]} - {y_extent[1]}"
+        x_extent = f"{x_extent.min} - {x_extent.max}"
+        y_extent = f"{y_extent.min} - {y_extent.max}"
         x_res = str(x_res)
         y_res = str(y_res)
 
@@ -88,5 +92,6 @@ def _log_xcube_stats(xcube: xr.Dataset, prefix: str = "xcube"):
     logger.debug(f"{prefix} Y Extent: {y_extent} ({y_res})")
 
     if "time" in xcube.dims:
-        time_extent = xcube.time[0].item(), xcube.time[-1].item()
-        logger.debug(f"{prefix} Time Extent: {time_extent[0]} - {time_extent[1]}")
+        time_extent = _Extent(xcube.time[0].item(), xcube.time[-1].item())
+        time_res = (xcube.time[1] - xcube.time[0]).item()
+        logger.debug(f"{prefix} Time Extent: {time_extent.min} - {time_extent.max} ({time_res})")

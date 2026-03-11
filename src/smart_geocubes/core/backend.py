@@ -286,7 +286,7 @@ class DownloadBackend(abc.ABC):
             logger.error(
                 f"{idx.id} failed to download after 5 tries. Please check your internet connection and data access."
             )
-            raise ValueError(f"{idx.id=}: 5 tries to download the tile failed. ") from last_exception
+            raise RuntimeError(f"{idx.id=}: 5 tries to download the tile failed. ") from last_exception
         patch.attrs["patch_id"] = idx.id
         return patch
 

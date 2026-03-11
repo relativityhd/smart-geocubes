@@ -211,12 +211,12 @@ class ArcticDEMABC(STACAccessor):
 
         resolution = f"{int(self.extent.resolution.x)}m"
         # do intersection in Polar Sterographic to avoid Problems around antimeridian
-        extent_info = gpd.read_parquet(self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{resolution}.parquet").to_crs(3995)
+        extent_info = gpd.read_parquet(self._aux_dir / f"ArcticDEM_Mosaic_Index_v4_1_{resolution}.parquet").to_crs(3413)
         if isinstance(roi, gpd.GeoDataFrame):
             adjacent_tiles = (
                 gpd.sjoin(
                     extent_info,
-                    roi[["geometry"]].to_crs(3995),
+                    roi[["geometry"]].to_crs(3413),
                     how="inner",
                     predicate="intersects",
                 )
@@ -224,11 +224,9 @@ class ArcticDEMABC(STACAccessor):
                 .drop_duplicates(subset="index", keep="first", ignore_index=True)
             )
         elif isinstance(roi, GeoBox):
-            roi_3413 = roi.to_crs(3413)
-            adjacent_tiles = extent_info.loc[extent_info.intersects(roi_3413.boundingbox.polygon.geom)].copy()
+            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.to_crs(3413).boundingbox.polygon.geom)].copy()
         elif isinstance(roi, Geometry):
-            roi_3413 = roi.to_crs(3413)
-            adjacent_tiles = extent_info.loc[extent_info.intersects(roi_3413.geom)].copy()
+            adjacent_tiles = extent_info.loc[extent_info.intersects(roi.to_crs(3413).geom)].copy()
         else:
             raise ValueError("roi must be a GeoBox or a GeoDataFrame")
         if adjacent_tiles.empty:

@@ -209,6 +209,7 @@ class TCTrend2022(TCTrendABC):
 
     collection = "users/ingmarnitze/TCTrend_SR_2003-2022_TCVIS"
 
+
 class TCTrend2024(TCTrendABC):
     """Accessor for TCTrend data derived from 2005-2024.
 
@@ -227,6 +228,7 @@ class TCTrend2024(TCTrendABC):
     """
 
     collection = "projects/ee-ingmarnitze/assets/TCTrend_SR_2005-2024_TCVIS"
+
 
 # Aliasing TCTrend2024 to TCTrend for backward compatibility
 TCTrend = TCTrend2024
