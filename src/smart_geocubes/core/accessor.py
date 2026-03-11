@@ -82,7 +82,7 @@ class RemoteAccessor(ABC):
                 This should be disabled in a multiprocessing environment.
                 Defaults to True.
             backend (Literal["threaded", "simple"], optional): The backend to use for downloading data.
-                Currently, only "threaded" is supported. Defaults to "threaded".
+                Currently, only "simple" and "threaded" are supported. Defaults to "threaded".
 
         Raises:
             ValueError: If the storage is not an icechunk.Storage.
@@ -397,7 +397,7 @@ class RemoteAccessor(ABC):
                     xrcube_aoi = xrcube_aoi.load()
         return xrcube_aoi
 
-    def procedural_download(self, aoi: Geometry | GeoBox, toi: TOI):
+    def procedural_download(self, aoi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI):
         """Download tiles procedurally.
 
         Warning:
@@ -407,8 +407,9 @@ class RemoteAccessor(ABC):
             In such cases, the download will be retried until it succeeds or the number of maximum-tries is reached.
 
         Args:
-            aoi (Geometry | GeoBox): The geometry of the aoi to download. If a Geobox is provided,
-                it will use the extent of the geobox.
+            aoi (Geometry | GeoBox | gpd.GeoDataFrame): The geometry of the aoi to download.
+                If a Geobox is provided, it will use the extent of the geobox.
+                If a GeoDataFrame is provided, it will use the geometries of the geodataframe.
             toi (TOI): The time of interest to download.
 
         Raises:
@@ -419,9 +420,13 @@ class RemoteAccessor(ABC):
         if isinstance(aoi, GeoBox):
             aoi = aoi.extent
 
+        if isinstance(aoi, gpd.GeoDataFrame):
+            soi = f"GeoDataFrame {aoi.shape[0]} geometries" + (f" @ {_repr_toi(toi)}" if toi is not None else "")
+        else:
+            soi = f"{_geometry_repr(aoi)}" + (f" @ {_repr_toi(toi)}" if toi is not None else "")
+
         adjacent_patches = self.adjacent_patches(aoi, toi)
         # interest-string
-        soi = f"{_geometry_repr(aoi)}" + (f" @ {_repr_toi(toi)}" if toi is not None else "")
         if not adjacent_patches:
             logger.error(f"{soi}: No adjacent patches found: {adjacent_patches=}")
             raise ValueError("No adjacent patches found - is the provided aoi and toi correct?")
