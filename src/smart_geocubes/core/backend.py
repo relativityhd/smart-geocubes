@@ -234,9 +234,9 @@ class DownloadBackend(abc.ABC):
 
         """
         zcube = self.open_zarr(session)
-        loaded_patches = cast(list[str], zcube.attrs.get("loaded_patches", []))
-        assert isinstance(loaded_patches, list), "Expected 'loaded_patches' attribute to be a list of strings."
-        return loaded_patches
+        loaded_patches = zcube.attrs.get("loaded_patches", [])
+        assert isinstance(loaded_patches, list), "loaded_patches attribute is not a list."
+        return cast(list[str], loaded_patches.copy())
 
     def _get_target_slice(
         self, patch: xr.Dataset, session: icechunk.Session | None = None

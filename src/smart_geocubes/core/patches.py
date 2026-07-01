@@ -21,7 +21,7 @@ class PatchIndex[PatchItem]:
     geometry: Geometry
 
     """The time of the patch, if applicable."""
-    time: tuple[str, str] | tuple[datetime, datetime] | str | datetime | None = None
+    time: tuple[str, str] | tuple[datetime, datetime] | str | datetime | None
 
     """An associated item or metadata object useful for other operations."""
-    item: PatchItem | None = None
+    item: PatchItem

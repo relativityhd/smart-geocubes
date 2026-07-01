@@ -19,7 +19,6 @@ from zarr.core.sync import sync
 
 from smart_geocubes.backends import SimpleBackend, ThreadedBackend
 from smart_geocubes.core.patches import PatchIndex
-from smart_geocubes.core.storage import optimize_coord_encoding, optimize_temporal_encoding
 from smart_geocubes.core.toi import TOI, _repr_toi
 from smart_geocubes.core.utils import _check_python_version, _geobox_repr, _geometry_repr
 
@@ -35,7 +34,6 @@ logger = logging.getLogger(__name__)
 class LoadParams(TypedDict):
     """TypedDict for the load function parameters."""
 
-    buffer: int
     persist: bool
     create: bool
 
@@ -161,9 +159,9 @@ class RemoteAccessor(ABC):
         """
         session = self.repo.readonly_session("main")
         zcube = zarr.open(store=session.store, mode="r")
-        loaded_patches = cast(list[str], zcube.attrs.get("loaded_patches", []))
-        assert isinstance(loaded_patches, list), "Expected 'loaded_patches' attribute to be a list of strings."
-        return loaded_patches.copy()
+        patches = zcube.attrs.get("loaded_patches", [])
+        assert isinstance(patches, list), f"Expected a list of loaded patches, but got {type(patches)}"
+        return cast(list[str], patches.copy())
 
     def assert_created(self):
         """Assert that the datacube exists in the storage."""
@@ -229,7 +227,7 @@ class RemoteAccessor(ABC):
 
             logger.debug(
                 f"Creating an empty zarr datacube '{self.title}' with the variables"
-                f" {self.channels} at a {self.extent.resolution=}"
+                f" {self.channels} at {_geobox_repr(self.extent)}"
                 f" and {self.chunk_size=} to {session.store=}"
             )
 
@@ -256,11 +254,11 @@ class RemoteAccessor(ABC):
 
             # Get the encoding for the coordinates, variables and spatial reference
             coords_encoding = {
-                "x": {"chunks": ds.x.shape, **optimize_coord_encoding(ds.x.values)},
-                "y": {"chunks": ds.y.shape, **optimize_coord_encoding(ds.y.values)},
+                "x": {"chunks": ds.x.shape, "compressors": [BloscCodec()]},
+                "y": {"chunks": ds.y.shape, "compressors": [BloscCodec()]},
             }
             if self.temporal_extent is not None:
-                coords_encoding["time"] = {"chunks": ds.time.shape, **optimize_temporal_encoding(self.temporal_extent)}
+                coords_encoding["time"] = {"chunks": ds.time.shape, "compressors": [BloscCodec()]}
             chunks = (
                 (1, self.chunk_size, self.chunk_size)
                 if self.temporal_extent is not None
@@ -269,7 +267,7 @@ class RemoteAccessor(ABC):
             var_encoding = {
                 name: {
                     "chunks": chunks,
-                    "compressors": [BloscCodec(clevel=9)],
+                    "compressors": [BloscCodec()],
                     **self._channels_encoding[name],
                 }
                 for name in self.channels
@@ -369,8 +367,10 @@ class RemoteAccessor(ABC):
                 self.assert_created()
 
             # Download the adjacent tiles (if necessary)
-            assert self.extent.crs is not None, "Expected the datacube extent to have a defined CRS."
-            aligned_aoi = aoi.to_crs(self.extent.crs)
+            if self.extent.crs != aoi.crs and self.extent.crs is not None:
+                aligned_aoi = aoi.to_crs(self.extent.crs)
+            else:
+                aligned_aoi = aoi
             with self.stopuhr(f"{_geometry_repr(aoi)}: Procedural download of missing tiles"):
                 self.procedural_download(aligned_aoi, toi)
 

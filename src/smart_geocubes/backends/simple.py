@@ -1,7 +1,6 @@
-"""Write specific backends."""
+"""A simple backend, which writes patches to the zarr store in a blocking manner."""
 
 import logging
-from typing import cast
 
 import xarray as xr
 import zarr
@@ -29,8 +28,8 @@ class SimpleBackend(DownloadBackend):
 
         target = self._get_target_slice(patch)
 
-        data_vars = cast(list[str], list(patch.data_vars.keys()))
-        for var in data_vars:
+        for var in patch.data_vars:
+            assert isinstance(var, str)
             self._write_patch_variable(zcube, patch[var].data, var, target, patch_id)
 
         loaded_patches.append(patch_id)

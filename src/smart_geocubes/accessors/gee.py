@@ -99,6 +99,7 @@ class GEEMosaicAccessor(RemoteAccessor):
             raise ValueError("Datacube is not temporal, but time of interest is provided.")
 
         if isinstance(roi, gpd.GeoDataFrame):
+            assert self.extent.crs is not None, "Extent CRS is not set."
             adjacent_geometries = (
                 gpd.sjoin(self._tile_geometries, roi.to_crs(self.extent.crs.wkt), how="inner", predicate="intersects")
                 .reset_index()

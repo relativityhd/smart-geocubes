@@ -1,11 +1,13 @@
-"""Write specific backends."""
+"""A threaded backend, which parallelizes the download and writing processes.
+
+This requires Python 3.13 or higher, as it uses the new queue.shutdown() method.
+"""
 
 import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, wait
 from queue import Queue
 from threading import Thread
-from typing import cast
 
 import icechunk
 import xarray as xr
@@ -123,11 +125,12 @@ class ThreadedBackend(DownloadBackend):
 
         target = self._get_target_slice(patch, session)
 
-        data_vars = cast(list[str], list(patch.data_vars.keys()))
-        futures = {
-            self.writing_pool.submit(self._write_patch_variable, zcube, patch[var].data, var, target, patch_id): var
-            for var in data_vars
-        }
+        futures = {}
+        for var in patch.data_vars:
+            assert isinstance(var, str)
+            future = self.writing_pool.submit(self._write_patch_variable, zcube, patch[var].data, var, target, patch_id)
+            futures[future] = var
+
         _, failed = wait(futures)
         if len(failed) > 0:
             logger.error(f"Writing patch {patch_id} failed for variables {[futures[f] for f in failed]}.")

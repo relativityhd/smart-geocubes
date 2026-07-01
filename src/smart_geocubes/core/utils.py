@@ -3,10 +3,17 @@
 import logging
 import sys
 from collections import namedtuple
+from typing import TYPE_CHECKING
 
 import xarray as xr
 from odc.geo.geobox import GeoBox
 from odc.geo.geom import Geometry
+
+if TYPE_CHECKING:
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -103,3 +110,20 @@ def _log_xcube_stats(xcube: xr.Dataset, prefix: str = "xcube"):
         time_extent = _Extent(xcube.time[0].item(), xcube.time[-1].item())
         time_res = (xcube.time[1] - xcube.time[0]).item()
         logger.debug(f"{prefix} Time Extent: {time_extent.min} - {time_extent.max} ({time_res})")
+
+
+def _add_cartopy_features(ax: "plt.Axes"):
+    import cartopy.feature as cfeature
+
+    # Add features
+    ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black", facecolor="white")  # ty:ignore[unresolved-attribute]
+    ax.add_feature(cfeature.OCEAN, zorder=0, facecolor="lightgrey")  # ty:ignore[unresolved-attribute]
+    ax.add_feature(cfeature.COASTLINE)  # ty:ignore[unresolved-attribute]
+    ax.add_feature(cfeature.BORDERS, linestyle=":")  # ty:ignore[unresolved-attribute]
+    ax.add_feature(cfeature.LAKES, alpha=0.5)  # ty:ignore[unresolved-attribute]
+    ax.add_feature(cfeature.RIVERS)  # ty:ignore[unresolved-attribute]
+
+    # Add gridlines
+    gl = ax.gridlines(draw_labels=True)  # ty:ignore[unresolved-attribute]
+    gl.top_labels = False
+    gl.right_labels = False

@@ -66,7 +66,7 @@ class STACAccessor(RemoteAccessor):
     stac_api_url: str
     collection: str
 
-    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI | None) -> list[PatchIndex["Item"]]:
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex["Item"]]:
         """Get the adjacent patches for the given geobox.
 
         Must be implemented by the Accessor.
@@ -98,6 +98,7 @@ class STACAccessor(RemoteAccessor):
             raise ValueError("Invalid ROI type.")
 
         search = catalog.search(collections=[self.collection], intersects=geom, datetime=toi_range)
+        search = catalog.search(collections=[self.collection], intersects=geom, datetime=toi_range)
         items = list(search.items())
 
         patch_idxs = []
@@ -108,13 +109,10 @@ class STACAccessor(RemoteAccessor):
                 if item.datetime is not None:
                     idx = PatchIndex(item.id, geom, item.datetime, item)
                 else:
-                    assert (
-                        item.common_metadata.start_datetime is not None
-                        and item.common_metadata.end_datetime is not None
-                    ), "Expected item to have a datetime or start_datetime and end_datetime in common_metadata."
-                    idx = PatchIndex(
-                        item.id, geom, (item.common_metadata.start_datetime, item.common_metadata.end_datetime), item
-                    )
+                    start = item.common_metadata.start_datetime
+                    end = item.common_metadata.end_datetime
+                    assert start is not None and end is not None, f"Item {item.id} has no temporal extent."
+                    idx = PatchIndex(item.id, geom, (start, end), item)
             else:
                 idx = PatchIndex(item.id, geom, None, item)
             patch_idxs.append(idx)

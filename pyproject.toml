@@ -74,9 +74,10 @@ dev = [
     "ipykernel>=6.29.5",
     "ipywidgets>=8.1.5",
     "jupyterlab>=4.5.0",
+    "pyrefly>=1.1.1",
     "rich>=13.9.4",
     "ruff>=0.15.5",
-    "ty>=0.0.21",
+    "ty>=0.0.55",
 ]
 tests = ["pytest>=8.3.4"]
 docs = [

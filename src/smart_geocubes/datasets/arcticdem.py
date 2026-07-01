@@ -15,11 +15,9 @@ from odc.geo.geom import Geometry
 from stopuhr import stopuhr
 
 from smart_geocubes.accessors.stac import STACAccessor
-from smart_geocubes.core import TOI, PatchIndex
+from smart_geocubes.core import TOI
 
 if TYPE_CHECKING:
-    from pystac import Item
-
     try:
         import matplotlib.pyplot as plt
     except ImportError:
@@ -188,7 +186,7 @@ class ArcticDEMABC(STACAccessor):
         """Download the ArcticDEM mosaic extent info and store it in the datacube."""
         _download_arcticdem_extent(self._aux_dir)
 
-    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex["Item"]]:
+    def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[LazyStacPatchIndex]:  # ty:ignore[invalid-method-override]
         """Get adjacent patch indexes from a STAC API.
 
         Overwrite the default implementation from the STAC accessor
@@ -202,7 +200,7 @@ class ArcticDEMABC(STACAccessor):
                 Not used in this implementation since ArcticDEM is not temporal.
 
         Returns:
-            list[PatchIndex]: List of adjacent patches, wrapped in own datastructure for easier processing.
+            list[LazyStacPatchIndex]: List of adjacent patches, wrapped in own datastructure for easier processing.
 
         Raises:
             ValueError: If the roi is not a GeoBox or a GeoDataFrame.
@@ -252,9 +250,10 @@ class ArcticDEMABC(STACAccessor):
 
         """
         import cartopy.crs as ccrs
-        import cartopy.feature as cfeature
         import matplotlib.path as mpath
         import matplotlib.pyplot as plt
+
+        from smart_geocubes.core.utils import _add_cartopy_features
 
         tile_info = self.current_state()
 
@@ -273,17 +272,7 @@ class ArcticDEMABC(STACAccessor):
         ax.set_extent([-180, 180, 50, 90], crs=ccrs.PlateCarree())  # ty:ignore[unresolved-attribute]
 
         # Add features
-        ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black", facecolor="white")  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.OCEAN, zorder=0, facecolor="lightgrey")  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.COASTLINE)  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.BORDERS, linestyle=":")  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.LAKES, alpha=0.5)  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.RIVERS)  # ty:ignore[unresolved-attribute]
-
-        # Add gridlines
-        gl = ax.gridlines(draw_labels=True)  # ty:ignore[unresolved-attribute]
-        gl.top_labels = False
-        gl.right_labels = False
+        _add_cartopy_features(ax)
 
         # Compute a circle in axes coordinates, which we can use as a boundary
         # for the map. We can pan/zoom as much as we like - the boundary will be

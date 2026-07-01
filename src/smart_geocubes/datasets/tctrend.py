@@ -102,8 +102,9 @@ class TCTrendABC(GEEMosaicAccessor):
 
         """
         import cartopy.crs as ccrs
-        import cartopy.feature as cfeature
         import matplotlib.pyplot as plt
+
+        from smart_geocubes.core.utils import _add_cartopy_features
 
         tile_info = self.current_state()
 
@@ -122,17 +123,7 @@ class TCTrendABC(GEEMosaicAccessor):
         ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())  # ty:ignore[unresolved-attribute]
 
         # Add features
-        ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black", facecolor="white")  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.OCEAN, zorder=0, facecolor="lightgrey")  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.COASTLINE)  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.BORDERS, linestyle=":")  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.LAKES, alpha=0.5)  # ty:ignore[unresolved-attribute]
-        ax.add_feature(cfeature.RIVERS)  # ty:ignore[unresolved-attribute]
-
-        # Add gridlines
-        gl = ax.gridlines(draw_labels=True)  # ty:ignore[unresolved-attribute]
-        gl.top_labels = False
-        gl.right_labels = False
+        _add_cartopy_features(ax)
 
         tile_info.plot(
             "id",
