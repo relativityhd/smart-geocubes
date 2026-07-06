@@ -1,14 +1,25 @@
 import logging
 import os
+import shutil
 from collections import namedtuple
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import ee
 import icechunk
+import pytest
 from odc.geo.geobox import GeoBox
 from pytest import approx
 
 import smart_geocubes
+
+# Mark as integration tests that require Google Earth Engine credentials.
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not (os.getenv("GEE_PROJECT") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")),
+        reason="GEE credentials not configured; skip integration tests",
+    ),
+]
 
 # Setup logging
 logger = logging.getLogger("smart_geocubes")
@@ -37,7 +48,7 @@ def test_tctrend2019_download():
     finally:
         if "tc" in locals():
             del tc
-        os.system("rm -rf tctrend2019.zarr")
+        shutil.rmtree("tctrend2019.zarr", ignore_errors=True)
 
 
 def test_tctrend2020_download():
@@ -60,7 +71,7 @@ def test_tctrend2020_download():
     finally:
         if "tc" in locals():
             del tc
-        os.system("rm -rf tctrend2020.zarr")
+        shutil.rmtree("tctrend2020.zarr", ignore_errors=True)
 
 
 def test_tctrend2022_download():
@@ -83,7 +94,7 @@ def test_tctrend2022_download():
     finally:
         if "tc" in locals():
             del tc
-        os.system("rm -rf tctrend2022.zarr")
+        shutil.rmtree("tctrend2022.zarr", ignore_errors=True)
 
 
 def test_tctrend2024_download():
@@ -106,7 +117,7 @@ def test_tctrend2024_download():
     finally:
         if "tc" in locals():
             del tc
-        os.system("rm -rf tctrend2024.zarr")
+        shutil.rmtree("tctrend2024.zarr", ignore_errors=True)
 
 
 Stats = namedtuple("Stats", ["mean", "min", "max"])
@@ -149,7 +160,7 @@ def test_tctrend2024_download_threaded():
             assert tcg.min == approx(0)
             assert tcg.max == approx(255)
     finally:
-        os.system("rm -rf tctrend2024.zarr")
+        shutil.rmtree("tctrend2024.zarr", ignore_errors=True)
 
 
 def _mp_task(i, geobox: GeoBox) -> tuple[int, tuple[Stats, Stats, Stats]]:
@@ -197,4 +208,4 @@ def test_tctrend2024_download_blocking_processes():
             assert tcg.min == approx(0)
             assert tcg.max == approx(255)
     finally:
-        os.system("rm -rf tctrend2024.zarr")
+        shutil.rmtree("tctrend2024.zarr", ignore_errors=True)

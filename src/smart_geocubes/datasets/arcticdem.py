@@ -234,7 +234,7 @@ class ArcticDEMABC(STACAccessor):
         return [
             LazyStacPatchIndex(tile.dem_id, _get_stac_url(tile.dem_id, resolution))
             for tile in adjacent_tiles.itertuples()
-        ]  # ty:ignore[invalid-return-type]
+        ]
 
     def visualize_state(self, ax: "plt.Axes | None" = None) -> "plt.Figure | plt.Axes":
         """Visulize the extend, hence the already downloaded and filled data, of the datacube.

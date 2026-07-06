@@ -17,3 +17,8 @@ playground.ipynb
 
 # Ruff
 .ruff_cache
+
+# JOSS Stuff
+jats/*
+paper.pdf
+.cache

@@ -50,6 +50,7 @@ class RemoteAccessor(ABC):
         title (str): The title of the datacube.
         stopuhr (Chronometer): The benchmarking timer from the stopuhr library.
         created (bool): True if the datacube already exists in the storage.
+        is_temporal (bool): True if the datacube has a temporal dimension.
 
     """
 
@@ -71,7 +72,8 @@ class RemoteAccessor(ABC):
 
         !!! warning
 
-            In a multiprocessing environment, it is strongly recommended to not set `create_icechunk_storage=False`.
+            In a multiprocessing environment, it is strongly recommended to set `create_icechunk_storage=False`
+            and to manually create the icechunk repository.
 
         Args:
             storage (icechunk.Storage): The icechunk storage of the datacube.

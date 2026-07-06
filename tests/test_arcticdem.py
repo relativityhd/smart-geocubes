@@ -1,14 +1,19 @@
 import logging
-import os
+import shutil
 from collections import namedtuple
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import icechunk
+import pytest
 from numpy.testing import assert_almost_equal
 from odc.geo.geobox import GeoBox
 from pytest import approx
 
 import smart_geocubes
+
+# These tests exercise remote data access and multi-process behavior.
+# Mark them as integration tests so they are skipped by default in CI.
+pytestmark = [pytest.mark.integration]
 
 # Setup logging
 logger = logging.getLogger("smart_geocubes")
@@ -40,7 +45,7 @@ def test_arcticdem32m_download():
     finally:
         if "adem" in locals():
             del adem
-        os.system("rm -rf arcticdem_32m.zarr")
+        shutil.rmtree("arcticdem_32m.zarr", ignore_errors=True)
 
 
 def test_arcticdem2m_download():
@@ -66,7 +71,7 @@ def test_arcticdem2m_download():
     finally:
         if "adem" in locals():
             del adem
-        os.system("rm -rf arcticdem_2m.zarr")
+        shutil.rmtree("arcticdem_2m.zarr", ignore_errors=True)
 
 
 Stats = namedtuple("Stats", ["mean", "min", "max"])
@@ -98,7 +103,7 @@ def test_arcticdem_download_threaded():
             assert result.min == approx(46.429688)
             assert result.max == approx(483.83594)
     finally:
-        os.system("rm -rf arcticdem_32m.zarr")
+        shutil.rmtree("arcticdem_32m.zarr", ignore_errors=True)
 
 
 def _mp_task(i, geobox: GeoBox) -> tuple[int, Stats]:
@@ -134,4 +139,4 @@ def test_arcticdem_download_blocking_processes():
             assert result.min == approx(46.429688)
             assert result.max == approx(483.83594)
     finally:
-        os.system("rm -rf arcticdem_32m.zarr")
+        shutil.rmtree("arcticdem_32m.zarr", ignore_errors=True)

@@ -10,9 +10,12 @@ edit_uri: edit/main/docs/
 
 nav:
   - Home: index.md
-  - Getting Started: examples/quickstart.ipynb
-  - How does it work?: how_it_works.md
-  - Contribute: contribute.md
+  - Guides:
+      - Getting Started: examples/quickstart.ipynb
+      - How does it work?: how_it_works.md
+      - Architecture: architecture.md
+      - Add your own dataset: custom-accessor.md
+      - Contribute: contribute.md
 
 theme:
   name: material
@@ -161,7 +164,11 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.details
   - attr_list
   - md_in_html

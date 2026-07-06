@@ -1,4 +1,4 @@
-import os
+import shutil
 from typing import ClassVar
 
 import icechunk
@@ -116,7 +116,7 @@ def test_create_datacube():
         finally:
             if "ds" in locals():
                 del ds
-            os.system("rm -rf test.zarr")
+            shutil.rmtree("test.zarr", ignore_errors=True)
 
 
 def test_create_datacube_exists():
@@ -127,7 +127,7 @@ def test_create_datacube_exists():
         with pytest.raises(FileExistsError):
             accessor.create()
     finally:
-        os.system("rm -rf test.zarr")
+        shutil.rmtree("test.zarr", ignore_errors=True)
 
 
 def test_create_datacube_overwrite():
@@ -137,4 +137,4 @@ def test_create_datacube_overwrite():
         accessor.create()
         accessor.create(overwrite=True)
     finally:
-        os.system("rm -rf test.zarr")
+        shutil.rmtree("test.zarr", ignore_errors=True)
