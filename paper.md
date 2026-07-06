@@ -9,13 +9,13 @@ authors:
     orcid: 0009-0005-9058-0882
     affiliation: "1, 2"
   - name: Jonas Küpper
-    orcid: 
+    orcid: 0000-0001-6728-7411
     affiliation: 1
   - name: Ingmar Nitze
-    orcid:
+    orcid: 0000-0002-1165-6852
     affiliation: 1
   - name: Guido Grosse
-    orcid: 
+    orcid: 0000-0001-5895-2141
     affiliation: "1, 2"
 affiliations:
  - name: Alfred-Wegener-Institut, Germany
@@ -40,7 +40,7 @@ for example, `AlphaEarth embeddings` require approximately 500 TB, while the `Se
 Data is further distributed across heterogeneous platforms (Google Earth Engine, Planetary Computer, STAC catalogs) and formats (`Zarr`, `GeoTIFF`, `COG`, `NetCDF`).
 
 Researchers must therefore download subsets of remote data while retaining the ability to incrementally add new regions without restructuring workflows.
-Due to it's chunk-based storage system, `Zarr` is most suitable for incrementally addition of sparse data.
+Due to its chunk-based storage system, `Zarr` is most suitable for incrementally addition of sparse data.
 Existing solutions such as Kerchunk and `VirtualiZarr` enable on-the-fly conversion from legacy formats to a Zarr-like data interface but require re-downloading data on each session. [@Nicholas_VirtualiZarr]
 `Smart-Geocubes` addresses this by procedurally downloading remote data subsets and persisting them in a `Zarr` store backed by Icechunk.
 This ensures rapid repeated access across sessions, supports incremental data addition without workflow changes, and downloads each chunk at most once, making the approach scalable as projects transition from experimentation to production.
@@ -56,7 +56,7 @@ While the Manifests are persisted locally to disk, the data is not.
 For Cloud-native workflows this may be sufficient, as the compute probably happens on the same infrastructure as the data.
 However, local first experimentation may suffer from repeated data downloads.
 
-`Smart-Geocubes` was build independent from `VirtualiZarr`, as it explicitly was build arounda no-data-duplication principle.
+`Smart-Geocubes` was build independent from `VirtualiZarr`, as it explicitly was build around a no-data-duplication principle.
 Further, `Smart-Geocubes` was build with custom parallelization through frameworks like e.g. Ray in mind, while `VirtualiZarr` is strongly integrated in the `Xarray`-`Dask` ecosystem.
 
 # Software design
@@ -78,11 +78,11 @@ Source-dependent accessors inherit from this class to define remote-specific ret
 The inheritance hierarchy enables extensibility: adding a new dataset from an existing source requires only a dataset-specific accessor, while supporting a new remote source requires implementing a source adapter that inherits from `RemoteAccessor`.
 
 Two `DownloadBackend` implementations coordinate downloads and writes: The `SimpleBackend` processes patches sequentially, straightforward and debuggable, while the `ThreadedBackend` uses worker threads and queues to download and write in parallel, providing higher throughput at the cost of added complexity.
-The User can select based on their network setup, overall the `ThreadedBackend` prooved stable and is the recommended backend due to it's advanced efficiency.
+The User can select based on their network setup, overall the `ThreadedBackend` proved stable and is the recommended backend due to it's advanced efficiency.
 
 # Research impact statement
 
-`Smart-Geocubes` has demonstrated significant research impact as beeing a core component in the `darts-nextgen` data pipeline and as an essential data-engineering component in at least one other paper. [@Holzer_DARTS-nextgen; @Nesterova2026]
+`Smart-Geocubes` has demonstrated significant research impact as being a core component in the `darts-nextgen` data pipeline and as an essential data-engineering component in at least one other paper. [@Holzer_DARTS-nextgen; @Nesterova2026]
 
 # AI usage disclosure
 
