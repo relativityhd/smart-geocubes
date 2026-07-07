@@ -28,9 +28,7 @@ bibliography: paper.bib
 
 # Summary
 
-The size of modern spatio-temporal datasets require that the experiment phase is only done on subsets, e.g. a few regions.
-As data formats and access methods vary widely in the geospatial community, this creates a scaling issue when an algorithm or model is expanded to the more and larger regions.
-`Smart-Geocubes` provides utilities for accessing such data in an efficient and scalable manner by applying a local-first strategy in form of `Zarr` datacubes, similar to a cache.
+The size of modern spatio-temporal datasets require that data exploration and processing is conducted on subsets, e.g. a few regions. Furthermore, data often comes from various sources, formats and in different projections, causing a massive overhead in data management and preparation. `Smart-Geocubes` provides utilities for accessing such data in an efficient and scalable manner by applying a local-first strategy in form of `Zarr` datacubes, similar to a cache, for the purpose of organizing and assesing avariety of geospatial data sources for machine learning applications.
 
 # Statement of need
 
