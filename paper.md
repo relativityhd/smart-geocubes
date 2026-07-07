@@ -34,15 +34,15 @@ The size of modern spatio-temporal datasets require that data exploration and pr
 
 Modern geospatial workflows, such as training image segmentation models, combining datasets, or change detection analysis, benefit from local experimentation due to fast feedback loops.
 However, contemporary geospatial datasets are often too large for local storage;
-for example, `AlphaEarth embeddings` require approximately 500 TB, while the `Sentinel-2` archive exceeds 40 PB.
+for example, `AlphaEarth embeddings` require approximately 500 TB, while the `Sentinel-2` archive exceeds 40 PB on a global scale.
 Data is further distributed across heterogeneous platforms (Google Earth Engine, Planetary Computer, STAC catalogs) and formats (`Zarr`, `GeoTIFF`, `COG`, `NetCDF`).
 
 Researchers must therefore download subsets of remote data while retaining the ability to incrementally add new regions without restructuring workflows.
 Due to its chunk-based storage system, `Zarr` is most suitable for incrementally addition of sparse data.
 Existing solutions such as Kerchunk and `VirtualiZarr` enable on-the-fly conversion from legacy formats to a Zarr-like data interface but require re-downloading data on each session. [@Nicholas_VirtualiZarr]
-`Smart-Geocubes` addresses this by procedurally downloading remote data subsets and persisting them in a `Zarr` store backed by Icechunk.
+`Smart-Geocubes` addresses this by procedurally downloading remote data subsets and persisting them in a `Zarr` store backed by Icechunk and managing subsetting and location mathing under the hood.
 This ensures rapid repeated access across sessions, supports incremental data addition without workflow changes, and downloads each chunk at most once, making the approach scalable as projects transition from experimentation to production.
-While pre-downloading regions of interest is an common and battle-tested approach, `Smart-Geocubes` is designed to ease, improve and unify this approach for geospatial researchers requiring local-first workflows with cloud-scale data.
+While pre-downloading regions of interest is a common and battle-tested approach, `Smart-Geocubes` is designed to ease, improve and unify this approach for geospatial researchers requiring local-first workflows with cloud-scale data.
 
 # State of the field
 
