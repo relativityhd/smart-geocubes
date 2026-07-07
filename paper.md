@@ -64,7 +64,7 @@ Further, `Smart-Geocubes` was build with custom parallelization through framewor
 The central design decision was adopting a procedural download paradigm: the local `Zarr` store is treated as a persistent cache incrementally populated on demand.
 This balances offline access to downloaded regions against avoiding upfront data transfer costs, streaming would result in repeated downloads and thus unnecessary data transfers, while pre-downloading entire archives is impractical for terabyte-scale datasets and often not needed.
 
-The choice of `Zarr` as the storage format stems from it's read and write performance and from it's inherent support for sparsity within data due to it's chunk-based format.
+The choice of `Zarr` as the storage format stems from its read and write performance and from its inherent support for sparsity within data due to it's chunk-based format.
 Further, `Zarr` has started to become the standard format for geospatial data over the recent years with major support and integration through libraries like `Xarray`.
 With the development of `Icechunk`, `Zarr` was extented by an transactional storage engine allowing for safe, semi-coordinated reads and writes.
 Thus utilizing `Icechunk` as the `Zarr` storage backend allowed `Smart-Geocubes` to ensure that parallel writes do not conflict or result in data loss, allowing fearless integration into parallelization frameworks like `Ray`.
