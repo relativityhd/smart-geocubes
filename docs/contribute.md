@@ -67,6 +67,7 @@ Features:
 - [ ] Overall: Add support for UTM-Zones
 - [ ] Overall: Add support for 3D data
 - [ ] Overall: Add support for 4D data
+- [ ] Overall: Add support for subsets of variables
 - [ ] Overall: Harden support for antimeridian
 - [x] GEE Accessor
 - [x] Widen support for lat-lon data

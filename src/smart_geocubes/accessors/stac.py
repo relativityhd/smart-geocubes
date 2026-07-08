@@ -84,8 +84,7 @@ class STACAccessor(RemoteAccessor):
         """
         import pystac_client
 
-        if self.is_temporal and toi is not None:
-            toi_range = extract_toi_range(toi)
+        toi_range = extract_toi_range(toi)
 
         catalog = pystac_client.Client.open(self.stac_api_url)
         if isinstance(roi, gpd.GeoDataFrame):
@@ -97,7 +96,6 @@ class STACAccessor(RemoteAccessor):
         else:
             raise ValueError("Invalid ROI type.")
 
-        search = catalog.search(collections=[self.collection], intersects=geom, datetime=toi_range)
         search = catalog.search(collections=[self.collection], intersects=geom, datetime=toi_range)
         items = list(search.items())
 

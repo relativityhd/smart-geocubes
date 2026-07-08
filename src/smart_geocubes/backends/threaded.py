@@ -4,6 +4,7 @@ This requires Python 3.13 or higher, as it uses the new queue.shutdown() method.
 """
 
 import logging
+import queue
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, wait
 from queue import Queue
@@ -77,8 +78,11 @@ class ThreadedBackend(DownloadBackend):
         while True:
             # This basically ensures that only a single patch is written at a time
             # The concurrency happens inside the write_patch function, where the variables are written in parallel
-            patch = self.write_queue.get()
-            if patch is None:
+            try:
+                patch = self.write_queue.get()
+            except queue.ShutDown:  # ty:ignore[unresolved-attribute] (This is a new exception in Python 3.13, which is why we can assume it exists)
+                # close() shuts the queue down to unblock this get(); that's the
+                # intended way to stop this loop, not an error.
                 break
 
             patch_id = patch.attrs.get("patch_id", "unknown")
@@ -131,10 +135,11 @@ class ThreadedBackend(DownloadBackend):
             future = self.writing_pool.submit(self._write_patch_variable, zcube, patch[var].data, var, target, patch_id)
             futures[future] = var
 
-        _, failed = wait(futures)
+        done, _ = wait(futures)
+        failed = [f for f in done if f.exception() is not None]
         if len(failed) > 0:
             logger.error(f"Writing patch {patch_id} failed for variables {[futures[f] for f in failed]}.")
-            raise RuntimeError(f"Writing patch {patch_id} failed.")
+            raise RuntimeError(f"Writing patch {patch_id} failed.") from failed[0].exception()
 
         loaded_patches.append(patch_id)
         zcube.attrs["loaded_patches"] = loaded_patches
