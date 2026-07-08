@@ -14,6 +14,7 @@ nav:
       - Getting Started: examples/quickstart.ipynb
       - How does it work?: how_it_works.md
       - Architecture: architecture.md
+      - Download Backends: backends.md
       - Add your own dataset: custom-accessor.md
       - Contribute: contribute.md
 

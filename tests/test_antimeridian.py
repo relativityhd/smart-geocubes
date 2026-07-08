@@ -6,8 +6,9 @@ from odc.geo.geobox import GeoBox
 
 import smart_geocubes
 
-# Only the first two tests in this module require Google Earth Engine.
-# Decorate them as integration tests and skip if GEE credentials are not configured.
+# All tests in this module hit remote services (Google Earth Engine or the ArcticDEM STAC
+# API) and are marked as integration tests. The GEE-backed tests additionally skip if
+# credentials are not configured; the ArcticDEM STAC API is public and needs no credentials.
 
 
 @pytest.mark.integration
@@ -40,6 +41,7 @@ def test_utm60_tcvis(tmp_path):
     accessor.procedural_download(aoi, None)
 
 
+@pytest.mark.integration
 def test_utm01_arcticdem(tmp_path):
     accessor = smart_geocubes.ArcticDEM10m(tmp_path / "arcticdem.icechunk")
     accessor.create(overwrite=False)
@@ -49,6 +51,7 @@ def test_utm01_arcticdem(tmp_path):
     accessor.procedural_download(aoi, None)
 
 
+@pytest.mark.integration
 def test_utm60_arcticdem(tmp_path):
     accessor = smart_geocubes.ArcticDEM10m(tmp_path / "arcticdem.icechunk")
     accessor.create(overwrite=False)

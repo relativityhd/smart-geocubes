@@ -49,17 +49,17 @@ arcticdem_at_roi = accessor.load(roi, create=True)
 
     ---
 
-    Get an overview on how this package works.
+    Learn how to use `smart-geocubes` with the quickstart notebook.
 
     [:octicons-arrow-right-24: Get Started](examples/quickstart.ipynb)
 
--   :material-file-question:{ .lg .middle } __Write custom Dataset Accessors__
+-   :material-cloud-download:{ .lg .middle } __Write custom Dataset Accessors__
 
     ---
 
-    Read how `smart-geocubes` works to learn how to access other datasets with own implemented accessors.
+    Read how `smart-geocubes` to add a new dataset or even a custom remote accessor.
 
-    [:octicons-arrow-right-24: How it Works](how_it_works.md)
+    [:octicons-arrow-right-24: Add your own dataset](custom-accessor.md)
 
 -   :material-open-source-initiative:{ .lg .middle } __Contribute__
 

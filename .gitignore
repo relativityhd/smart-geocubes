@@ -22,3 +22,6 @@ playground.ipynb
 jats/*
 paper.pdf
 .cache
+
+# mkdocs
+site/*
