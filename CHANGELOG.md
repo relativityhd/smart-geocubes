@@ -4,7 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-- Fix leftover ty errors after v0.1.4.
+## v0.1.6
+
+- Added a comprehensive unit test suite covering accessors, backends, time-of-interest, and utilities, along with a CI workflow to run it.
+- Fixed `STACAccessor` crashing with an `UnboundLocalError` when downloading without a time-of-interest, and removed a duplicate, redundant STAC search call.
+- Fixed `ThreadedBackend` silently swallowing exceptions from failed patch writes instead of raising them, and fixed its writer thread crashing instead of shutting down cleanly when the write queue closes.
+- Added backend documentation.
+- Fixed `ty` errors in the quickstart notebook.
+
+## v0.1.5
+
+- Fixed leftover `ty` type errors.
+- Added architecture and custom-accessor docs, a Code of Conduct, and this Changelog.
+- Expanded test coverage for antimeridian handling, ArcticDEM, and TCTrend.
 
 ## v0.1.4
 
