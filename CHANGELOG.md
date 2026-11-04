@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Improve install documentation
 - Integration tests are now skipped by default; run them with `pytest --integration`.
 
 ## v0.1.6

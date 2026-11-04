@@ -14,7 +14,7 @@ Smart-Geocubes is built for geospatial researchers, data engineers, and applied 
 It turns remote sources into cached, chunked datacubes so you can load only the areas you need, reuse what was already downloaded, and keep the workflow compatible with threaded or distributed processing.
 
 !!! abstract "Inspiration"
-The concept of this package is heavily inspired by [EarthMovers implementation of serverless datacube generation](https://earthmover.io/blog/serverless-datacube-pipeline).
+    The concept of this package is heavily inspired by [EarthMovers implementation of serverless datacube generation](https://earthmover.io/blog/serverless-datacube-pipeline).
 
 ## Quickstart
 
@@ -28,7 +28,7 @@ uv add smart-geocubes
 pip install smart-geocubes
 ```
 
-Data-source and utility dependencies can be installed through extras:
+Data-source and utility dependencies can be installed through extras (e.g. `uv add "smart-geocubes[stac]"`):
 
 | extra | dependencies                                      | Why                                              |
 | ----- | ------------------------------------------------- | ------------------------------------------------ |
