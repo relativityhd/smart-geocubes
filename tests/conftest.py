@@ -13,6 +13,26 @@ from smart_geocubes.accessors.gee import GEEMosaicAccessor
 from smart_geocubes.core.patches import PatchIndex
 
 
+def pytest_addoption(parser):
+    """Add the `--integration` command-line option."""
+    parser.addoption(
+        "--integration",
+        action="store_true",
+        default=False,
+        help="run integration tests (slow, require network access / credentials)",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip tests marked `integration` unless `--integration` is given."""
+    if config.getoption("--integration"):
+        return
+    skip_integration = pytest.mark.skip(reason="integration test, use --integration to run")
+    for item in items:
+        if "integration" in item.keywords:
+            item.add_marker(skip_integration)
+
+
 def patch_value(patch_id: str) -> float:
     """Compute the deterministic fill value for a non-temporal FakeGEEAccessor patch id.
 

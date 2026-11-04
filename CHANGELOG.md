@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Integration tests are now skipped by default; run them with `pytest --integration`.
+
 ## v0.1.6
 
 - Added a comprehensive unit test suite covering accessors, backends, time-of-interest, and utilities, along with a CI workflow to run it.

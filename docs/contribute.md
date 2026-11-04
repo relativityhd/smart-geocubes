@@ -23,10 +23,11 @@ uv sync --all-groups --all-extras
 
 As of now, there are some tests implemented which actually download data from the remote-locations (STAC, GEE) and test the values against expected ones.
 The download may take some time, up to several hours, depending on the internet connection.
-Thus, it is not recommended to run all tests at once.
+Thus, these integration tests (marked with `@pytest.mark.integration`) are skipped by default, so a plain `pytest` only executes unit tests.
 
 ```sh
-uv run pytest  # This may take some time!
+uv run pytest  # Fast: unit tests only
+uv run pytest --integration  # Full suite, this may take some time!
 ```
 
 ### Google Earth Engine (GEE) — credentials & running integration tests
@@ -46,17 +47,17 @@ Some datasets and integration tests use Google Earth Engine (GEE). To run those 
     - Unit tests (run in CI):
 
     ```bash
-    pytest -q -m "not integration"
+    pytest -q
     ```
 
     - Integration tests (requires GEE authentication and `GEE_PROJECT` if used by tests):
 
     ```bash
     export GEE_PROJECT=your-project-id
-    pytest -q -m integration
+    pytest -q --integration -m integration
     ```
 
-If you do not have GEE credentials, integration tests are intentionally marked with the `integration` marker and will be skipped by default in CI.
+If you do not have GEE credentials, integration tests are intentionally marked with the `integration` marker and are skipped by default, both locally and in CI. Pass `--integration` to run them.
 
 ## Roadmap
 
