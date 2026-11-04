@@ -6,15 +6,24 @@ A high-performance library for intelligent loading and caching of remote geospat
 
 ## Quickstart
 
-Install the package with `uv` or `pip`:
+Install the package with [`uv`](https://docs.astral.sh/uv/) or `pip`:
 
 ```sh
+# via uv (recommended)
+uv add smart-geocubes
+
+# or via pip
 pip install smart-geocubes
 ```
 
-```sh
-uv add smart-geocubes
-```
+Data-source and utility dependencies can be installed through extras:
+
+| extra | dependencies                                      | Why                                              |
+| ----- | ------------------------------------------------- | ------------------------------------------------ |
+| viz   | cartopy, folium, matplotlib, mapclassify          | Visualizations of local dataset state            |
+| dask  | bokeh, dask, distributed                          | Dask (will be used automatically through xarray) |
+| stac  | odc-stac, pyarrow, pystac, pystac-client, xpystac | STAC sources                                     |
+| gee   | earthengine-api, rasterio, rioxarray, xee         | Google Earth Engine sources                      |
 
 Open data for your region of interest:
 
@@ -22,6 +31,7 @@ Open data for your region of interest:
 import smart_geocubes
 from odc.geo.geobox import GeoBox
 
+# This requires the "stac" extra dependencies installed
 accessor = smart_geocubes.ArcticDEM32m("datacubes/arcticdem_32m.icechunk")
 
 roi = GeoBox.from_bbox((150, 65, 151, 65.5), shape=(1000, 1000), crs="EPSG:4326")
