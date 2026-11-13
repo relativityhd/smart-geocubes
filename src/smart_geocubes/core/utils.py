@@ -1,5 +1,6 @@
 """Utility functions for smart geocubes."""
 
+import importlib.util
 import logging
 import sys
 from collections import namedtuple
@@ -32,6 +33,27 @@ def _check_python_version(min_major: int, min_minor: int) -> bool:
     return sys.version_info.major > min_major or (
         sys.version_info.major == min_major and sys.version_info.minor >= min_minor
     )
+
+
+def _require_extra(extra: str, modules: list[str], used_by: str) -> None:
+    """Raise an error if the required modules for an extra are not installed.
+
+    Args:
+        extra (str): The name of the extra.
+        modules (list[str]): A list of module names that are required for the extra.
+        used_by (str): The name of the class or function that requires the extra.
+
+    Raises:
+        ModuleNotFoundError: If any of the required modules are not installed.
+
+    """
+    missing = [m for m in modules if importlib.util.find_spec(m) is None]
+    if missing:
+        raise ModuleNotFoundError(
+            f"{used_by} requires the '{extra}' extra (missing: {', '.join(missing)}). "
+            f"Install it with: pip install 'smart-geocubes[{extra}]'",
+            name=missing[0],
+        )
 
 
 def _geobox_repr(geobox: GeoBox) -> str:

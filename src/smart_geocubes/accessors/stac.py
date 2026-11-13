@@ -9,6 +9,7 @@ from odc.geo.geobox import GeoBox
 from odc.geo.geom import Geometry
 
 from smart_geocubes.core import TOI, PatchIndex, RemoteAccessor, extract_toi_range
+from smart_geocubes.core.utils import _require_extra
 
 if TYPE_CHECKING:
     from pystac import Item
@@ -65,6 +66,10 @@ class STACAccessor(RemoteAccessor):
 
     stac_api_url: str
     collection: str
+
+    @classmethod
+    def _check_dependencies(cls) -> None:
+        _require_extra("stac", ["odc.stac", "pyarrow", "pystac", "pystac_client", "xpystac"], cls.__name__)
 
     def adjacent_patches(self, roi: Geometry | GeoBox | gpd.GeoDataFrame, toi: TOI) -> list[PatchIndex["Item"]]:
         """Get the adjacent patches for the given geobox.

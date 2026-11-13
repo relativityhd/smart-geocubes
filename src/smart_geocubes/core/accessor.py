@@ -88,6 +88,8 @@ class RemoteAccessor(ABC):
             ValueError: If the storage is not an icechunk.Storage.
 
         """
+        self._check_dependencies()
+
         # Title is used for logging, debugging and as a default name for the datacube
         self.title = self.__class__.__name__
 
@@ -121,6 +123,13 @@ class RemoteAccessor(ABC):
             raise ValueError(f"Unknown backend {backend}")
 
         self.post_init()
+
+    @classmethod
+    def _check_dependencies(cls) -> None:
+        """Check if the required dependencies for the accessor are installed.
+
+        Meant to be overridden by the accessor.
+        """
 
     def post_init(self):
         """Post init actions. Can be overwritten by the dataset accessor."""

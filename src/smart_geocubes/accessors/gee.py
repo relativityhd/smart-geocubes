@@ -13,6 +13,7 @@ from odc.geo.geobox import GeoBox, GeoboxTiles
 from odc.geo.geom import Geometry
 
 from smart_geocubes.core import TOI, PatchIndex, RemoteAccessor, normalize_toi
+from smart_geocubes.core.utils import _require_extra
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,10 @@ class GEEMosaicAccessor(RemoteAccessor):
     """
 
     collection: str
+
+    @classmethod
+    def _check_dependencies(cls) -> None:
+        _require_extra("gee", ["ee", "rasterio", "rioxarray", "xee"], cls.__name__)
 
     @cached_property
     def _tile_geometries(self) -> gpd.GeoDataFrame:
