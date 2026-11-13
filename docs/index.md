@@ -14,41 +14,57 @@ Smart-Geocubes is built for geospatial researchers, data engineers, and applied 
 It turns remote sources into cached, chunked datacubes so you can load only the areas you need, reuse what was already downloaded, and keep the workflow compatible with threaded or distributed processing.
 
 !!! abstract "Inspiration"
-    The concept of this package is heavily inspired by [EarthMovers implementation of serverless datacube generation](https://earthmover.io/blog/serverless-datacube-pipeline).
+    The concept of this package is heavily inspired by [Earthmover’s implementation of serverless datacube generation](https://earthmover.io/blog/serverless-datacube-pipeline).
 
 ## Quickstart
 
-Install the package with [`uv`](https://docs.astral.sh/uv/) or `pip`:
+Install the package with your preferred package manager, e.g. [`uv`](https://docs.astral.sh/uv/) or `pip`:
 
 ```sh
-# via uv (recommended)
+# via uv (recommended, expects a uv-managed virtual environment with a pyproject.toml)
 uv add smart-geocubes
 
 # or via pip
 pip install smart-geocubes
 ```
 
-Data-source and utility dependencies can be installed through extras (e.g. `uv add "smart-geocubes[stac]"`):
+??? tip "Never heard of uv?"
+    Here's [why to use a pyproject.toml](https://pydevtools.com/blog/requirementstxt-vs-pyprojecttoml/) and [how uv compares to conda](https://pydevtools.com/handbook/explanation/uv-vs-pixi-vs-conda-for-scientific-python/).
 
-| extra | dependencies                                      | Why                                              |
-| ----- | ------------------------------------------------- | ------------------------------------------------ |
-| viz   | cartopy, folium, matplotlib, mapclassify          | Visualizations of local dataset state            |
-| dask  | bokeh, dask, distributed                          | Dask (will be used automatically through xarray) |
-| stac  | odc-stac, pyarrow, pystac, pystac-client, xpystac | STAC sources                                     |
-| gee   | earthengine-api, rasterio, rioxarray, xee         | Google Earth Engine sources                      |
-
-Open data for your region of interest:
+Open data for your region of interest (this example requires extra dependencies `uv add "smart-geocubes[stac]"` / `pip install "smart-geocubes[stac]"`):
 
 ```python
 import smart_geocubes
 from odc.geo.geobox import GeoBox
 
-# This requires the "stac" extra dependencies installed
+# ArcticDEM is downloaded via STAC, so this needs the "stac" extra dependencies installed
 accessor = smart_geocubes.ArcticDEM32m("datacubes/arcticdem_32m.icechunk")
 
 roi = GeoBox.from_bbox((150, 65, 151, 65.5), shape=(1000, 1000), crs="EPSG:4326")
 
 arcticdem_at_roi = accessor.load(roi, create=True)
+```
+
+### Extra Dependencies
+
+To minimize the impact on users’ environments, this library splits some of its dependencies into optional dependency groups ("extras").
+Data-source extras are required to use the matching datasets, e.g. `stac` for ArcticDEM or `gee` for the Google Earth Engine datasets. Feature extras like `viz` and `dask` add optional functionality.
+
+| extra  | dependencies                                      | Why                                              |
+| ------ | ------------------------------------------------- | ------------------------------------------------ |
+| `viz`  | cartopy, folium, matplotlib, mapclassify          | Visualizations of local dataset state            |
+| `dask` | bokeh, dask, distributed                          | Dask (will be used automatically through xarray) |
+| `stac` | odc-stac, pyarrow, pystac, pystac-client, xpystac | STAC sources                                     |
+| `gee`  | earthengine-api, rasterio, rioxarray, xee         | Google Earth Engine sources                      |
+
+These dependency groups ("extras") can be installed like this:
+
+```sh
+# via uv (recommended)
+uv add "smart-geocubes[gee,viz]"
+
+# or via pip
+pip install "smart-geocubes[gee,viz]"
 ```
 
 ## What's next?
@@ -67,7 +83,7 @@ arcticdem_at_roi = accessor.load(roi, create=True)
 
     ---
 
-    Read how `smart-geocubes` to add a new dataset or even a custom remote accessor.
+    Read how `smart-geocubes` internals work to add a new dataset or even a custom remote accessor.
 
     [:octicons-arrow-right-24: Add your own dataset](custom-accessor.md)
 
@@ -101,16 +117,16 @@ arcticdem_at_roi = accessor.load(roi, create=True)
 | Tasseled Cap Trends 2020         | `smart_geocubes.TCTrend2020`          | Google Earth Engine                      | [AWI](https://apgc.awi.de/dataset/pan-arctic-vis-landscape-change-2003-2022)                                             |
 | Tasseled Cap Trends 2022         | `smart_geocubes.TCTrend2022`          | Google Earth Engine                      | [AWI](https://apgc.awi.de/dataset/pan-arctic-vis-landscape-change-2003-2022)                                             |
 | Tasseled Cap Trends 2024         | `smart_geocubes.TCTrend2024`          | Google Earth Engine                      | [AWI](https://apgc.awi.de/dataset/pan-arctic-vis-landscape-change-2003-2022)                                             |
-| AlphaEarth Satellite Embeddings* | `smart_geocubes.AlphaEarthEmbeddings` | Google Earth Engine                      | [EE](https://developers.google.com/earth-engine/datasets/catalog/GOOGLE_SATELLITE_EMBEDDING_V1_ANNUAL?hl=de#description) |
+| AlphaEarth Satellite Embeddings* | `smart_geocubes.AlphaEarthEmbeddings` | Google Earth Engine                      | [EE](https://developers.google.com/earth-engine/datasets/catalog/GOOGLE_SATELLITE_EMBEDDING_V1_ANNUAL) |
 
-*: Note that the original embeddings are stored in their respective UTM-Zones, but Smart-Geocubes reprojects them into EPSG:4326 to create a single Datacube. This may change in the future, if UTM-Zones are properly supported.
+*: Note that the original embeddings are stored in their respective UTM Zones, but Smart-Geocubes reprojects them into EPSG:4326 to create a single datacube. This may change in the future, if UTM Zones are properly supported.
 
 ## Implemented Remote Accessors
 
 | Accessor                        | Description                                                                               |
 | ------------------------------- | ----------------------------------------------------------------------------------------- |
-| `smart_geocubes.accessors.STAC` | Accessor for the STAC API, which allows to download data from a STAC API.                 |
-| `smart_geocubes.accessors.GEE`  | Accessor for Google Earth Engine, which allows to download data from Google Earth Engine. |
+| `smart_geocubes.accessors.STAC` | Accessor for the STAC API, which allows downloading data from a STAC API.                 |
+| `smart_geocubes.accessors.GEE`  | Accessor for Google Earth Engine, which allows downloading data from Google Earth Engine. |
 
 ## What is the purpose of this package?
 
@@ -129,10 +145,10 @@ Using frameworks like Ray for processing is also tricky with this approach.
 They work better with "concurrent-processing": when each step of your processing pipeline can be done for each element separately instead of expecting to run a single step for all your data at once.
 Plus, if you only need to look at certain areas but don't know which ones ahead of time, downloading everything is wasteful.
 
-So instead, this package downloads the data only when you need it. But downloading the same thing over and over is inefficient. That's why we save (or "cache") the data on your computer's hard drive in form of zarr datacubes.
+So instead, this package downloads the data only when you need it. But downloading the same thing over and over is inefficient. That's why we save (or "cache") the data on your computer's hard drive in the form of zarr datacubes.
 We call this way of working "procedural download" because you download pieces as you need them.
 
-Therefore, this package does handle:
+Therefore, this package handles:
 
 1. The download "on-demand" (or "procedural download") of the data
 2. The caching of the data on your computer's hard drive
@@ -140,11 +156,10 @@ Therefore, this package does handle:
 4. Making everything thread-safe, so you can run on any scaling framework you like.
 
 !!! danger "Multiprocessing"
-    On linux systems it is necessary to the the multiprocessing start method to `spawn` or `forkserver`.
+    On linux systems it is necessary to set the multiprocessing start method to `spawn` or `forkserver`.
     Read more about this in [icechunk's documentation](https://icechunk.io/en/latest/icechunk-python/parallel/#uncooperative-distributed-writes), [a discussion on icechunk's GitHub repository](https://github.com/earth-mover/icechunk/discussions/802) and [in Polars documentation](https://docs.pola.rs/user-guide/misc/multiprocessing/).
 
-The approach itself is already implemented in one of the pipelines we develop at the AWI, you can read more about [their docs](https://awi-response.github.io/darts-nextgen/latest/dev/auxiliary/#procedural-download).
+The approach itself is already implemented in one of the pipelines we develop at the AWI, you can read more about it in [their docs](https://awi-response.github.io/darts-nextgen/latest/dev/auxiliary/#procedural-download).
 
 !!! note "Cloud computing"
-  
     This library won't help if your computer doesn't have fast storage space available - like if you're working on a cloud-cluster that can't save files locally.
