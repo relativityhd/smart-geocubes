@@ -48,9 +48,9 @@ Thus, the requirements around which `Smart-Geocubes` was designed are (1) local-
 
 # State of the field
 
-The tools closest in functionality to `Smart-Geocubes` are `VirtualiZarr`, `xee`, `stackstac`, `odc-stac` and `cubo` [@Nicholas_VirtualiZarr; @Montero2024; @Joseph_stackstac; @Xee; @OdcStac].
+The tools closest in functionality to `Smart-Geocubes` are `VirtualiZarr`, `xee`, `stackstac`, `odc-stac` and `cubo` [@Nicholas_VirtualiZarr; @Xee; @Joseph_stackstac; @OdcStac; @Montero2024].
 `xee`, `stackstac`, `odc-stac` and `cubo` are very similar in functionality, as they let users create datacubes on demand based on remote archival data from `STAC` or Google Earth Engine.
-Data is never persisted locally, as they download the data into `Xarray` datasets, thus working completely in memory.
+Data is lazily loaded into `Xarray` objects and is not automatically persisted locally, so repeated access to the same region requires fetching the data again.
 `VirtualiZarr` does the same but with virtual `Zarr` datacubes and by storing the metadata locally while leaving the original data untouched to support cloud-native workflows.
 It does that by creating so-called Manifests which map byte ranges of the remote data to chunks of a virtual Zarr array.
 On access to a specific region, `VirtualiZarr` downloads or opens the respective byte ranges over the network and merges the data to form the actual datacubes requested.
